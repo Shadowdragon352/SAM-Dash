@@ -1,3 +1,4 @@
+import BrandLogo from "@/components/BrandLogo";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity,
@@ -381,11 +382,9 @@ export default function Index() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b bg-background/95 px-5 py-4 backdrop-blur">
         <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-teal-700 p-2 text-white">
-            <Activity size={24} />
-          </div>
+          <BrandLogo className="w-28 sm:w-32" />
           <div>
-            <h1 className="text-xl font-semibold">DeliriumWatch</h1>
+            <h1 className="text-xl font-semibold">SAM</h1>
             <p className="text-xs text-muted-foreground">
               Patient monitoring · Research workspace
             </p>
