@@ -197,7 +197,11 @@ test("prediction contract rejects invalid probabilities and inconsistent horizon
     model_version: "trained-v1",
   };
   assert.equal(validatePrediction(p).probability, 0.2);
+  for (const status_level of ["green", "yellow", "red"])
+    assert.equal(validatePrediction({ ...p, status_level }).status_level, status_level);
   for (const row of [
+    { ...p, status_level: "invalid" },
+    { ...p, status_level: null },
     { ...p, probability: NaN },
     { ...p, probability: 1.1 },
     { ...p, horizon_hours: 0 },

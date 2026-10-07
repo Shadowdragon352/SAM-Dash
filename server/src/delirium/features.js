@@ -183,6 +183,7 @@ export function validatePrediction(result) {
     };
   if (
     result?.status !== "ok" ||
+    (result.status_level !== undefined && !["green", "yellow", "red"].includes(result.status_level)) ||
     result.schema_version !== "delirium-watch.prediction.v1" ||
     number(result.probability) === null ||
     result.probability < 0 ||
@@ -205,6 +206,7 @@ export function validatePrediction(result) {
     horizon_hours: result.horizon_hours,
     model_version: result.model_version.slice(0, 100),
     intended_use: "research",
+    ...(result.status_level !== undefined ? { status_level: result.status_level } : {}),
   };
 }
 export async function predict(features, fetcher = fetch) {
@@ -256,3 +258,4 @@ export async function predict(features, fetcher = fetch) {
     };
   }
 }
+

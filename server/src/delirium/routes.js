@@ -308,9 +308,12 @@ researchRouter.get(
       truncated,
       devices,
       assessments,
-      prediction: truncated
-        ? { status: "unavailable", reason: "Window exceeds event limit" }
-        : await predict(data.features),
+      prediction: {
+        ...(truncated
+          ? { status: "unavailable", reason: "Window exceeds event limit" }
+          : await predict(data.features)),
+        model_configured: Boolean(process.env.MODEL_URL),
+      },
     });
   }),
 );
@@ -444,3 +447,4 @@ researchRouter.get(
     }
   }),
 );
+

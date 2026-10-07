@@ -236,7 +236,7 @@ export default function Index() {
     setPatientsLoading(true);
     try {
       const response = await api.get("/patients", {
-        params: { search, page, limit: 100 },
+        params: { search, page, limit: 12 },
       });
       if (request !== patientRequest.current) return;
       setPatients(response.data.patients);
