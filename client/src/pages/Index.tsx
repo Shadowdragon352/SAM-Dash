@@ -380,11 +380,11 @@ export default function Index() {
     exportUrl = `${api.defaults.baseURL}/research/patients/${selected}/export?from=${now - 7 * 86400000}&to=${now}`;
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b bg-background/95 px-5 py-4 backdrop-blur">
-        <div className="flex items-center gap-3">
-          <BrandLogo className="w-28 sm:w-32" />
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b bg-background px-4 py-1.5">
+        <div className="flex items-center gap-2">
+          <BrandLogo className="w-16 sm:w-20" />
           <div>
-            <h1 className="text-xl font-semibold">SAM</h1>
+            <h1 className="text-base font-semibold">SAM</h1>
             <p className="text-xs text-muted-foreground">
               Patient monitoring · Research workspace
             </p>
