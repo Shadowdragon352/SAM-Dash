@@ -35,3 +35,7 @@ node_modules/
 client/dist/
 *.zip
 compose.before-integration.yaml
+
+# Local database backups
+backup/
+*.archive.gz
