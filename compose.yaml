@@ -1,0 +1,79 @@
+name: patient-health-monitoring
+
+services:
+  mongo:
+    image: mongo:8.0
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?Run node docker/init-config.mjs first}
+    volumes:
+      - ./mongo-data:/data/db
+    networks:
+      - database
+    healthcheck:
+      test: [CMD, mongosh, --quiet, --eval, "quit(db.adminCommand({ping: 1}).ok ? 0 : 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      PORT: "5000"
+      JWT_SECRET: ${JWT_SECRET:?Run node docker/init-config.mjs first}
+      MONGODB_URI: mongodb://root:${MONGO_PASSWORD:?Run node docker/init-config.mjs first}@mongo:27017/patient_monitoring?authSource=admin
+      VALID_API_KEYS: ${VALID_API_KEYS:-}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - database
+      - application
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:5000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${LOCAL_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - application
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/healthz]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+
+volumes:
+  mongo-data:
+
+networks:
+  database:
+    internal: true
+  application:

@@ -1,0 +1,17 @@
+.git
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+.env
+.env.*
+secrets
+**/*.log
+**/.DS_Store
+docs
+
+**/__pycache__
+**/.pytest_cache
+**/backups
+**/.env.before-*
+model-service/models/*

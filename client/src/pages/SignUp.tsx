@@ -22,21 +22,26 @@ const SignUp = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     fullName: "",
+    registrationCode: "",
     email: "",
     password: "",
-    role: "Cardiologist",
-    department: "Cardiology",
-    specialty: "Interventional Cardiology",
+    role: "doctor",
+    department: "",
+    specialty: "",
   });
 
   const { signup, isSigningUp } = useAuthStore();
 
   const validateForm = () => {
+    if (!formData.registrationCode.trim())
+      return toast.error("Registration code is required");
     if (!formData.fullName.trim()) return toast.error("Full name is required");
     if (!formData.email.trim()) return toast.error("Email is required");
-    if (!/\S+@\S+\.\S+/.test(formData.email)) return toast.error("Invalid email format");
+    if (!/\S+@\S+\.\S+/.test(formData.email))
+      return toast.error("Invalid email format");
     if (!formData.password) return toast.error("Password is required");
-    if (formData.password.length < 6) return toast.error("Password must be at least 6 characters");
+    if (formData.password.length < 8)
+      return toast.error("Password must be at least 8 characters");
 
     return true;
   };
@@ -55,7 +60,9 @@ const SignUp = () => {
 
       <Card className="w-full max-w-md border-border shadow-lg">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold tracking-tight">Create an account</CardTitle>
+          <CardTitle className="text-2xl font-bold tracking-tight">
+            Create an account
+          </CardTitle>
           <CardDescription className="text-muted-foreground">
             Enter your information to create your account
           </CardDescription>
@@ -71,7 +78,9 @@ const SignUp = () => {
                   type="text"
                   placeholder="John Doe"
                   value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, fullName: e.target.value })
+                  }
                   className="pl-10"
                   required
                 />
@@ -87,7 +96,9 @@ const SignUp = () => {
                   type="email"
                   placeholder="name@example.com"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
                   className="pl-10"
                   required
                 />
@@ -96,12 +107,16 @@ const SignUp = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
+              <Label htmlFor="role">
+                Registration code (from server operator)
+              </Label>
               <Input
                 id="role"
                 type="text"
-                value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                value={formData.registrationCode}
+                onChange={(e) =>
+                  setFormData({ ...formData, registrationCode: e.target.value })
+                }
               />
             </div>
 
@@ -111,7 +126,9 @@ const SignUp = () => {
                 id="department"
                 type="text"
                 value={formData.department}
-                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, department: e.target.value })
+                }
               />
             </div>
 
@@ -121,7 +138,9 @@ const SignUp = () => {
                 id="specialty"
                 type="text"
                 value={formData.specialty}
-                onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, specialty: e.target.value })
+                }
               />
             </div>
 
@@ -134,7 +153,9 @@ const SignUp = () => {
                   type={showPassword ? "text" : "password"}
                   placeholder="Create a strong password"
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
                   className="pl-10"
                   required
                 />
@@ -159,26 +180,15 @@ const SignUp = () => {
               {isSigningUp ? "Creating..." : "Create account"}
             </Button>
           </form>
-
-          <div className="relative my-4">
-            <Separator />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="bg-background px-2 text-sm text-muted-foreground">
-                Or continue with
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" className="w-full">Google</Button>
-            <Button variant="outline" className="w-full">Microsoft</Button>
-          </div>
         </CardContent>
 
         <CardFooter className="flex justify-center">
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link to="/login" className="text-primary hover:underline font-medium">
+            <Link
+              to="/login"
+              className="text-primary hover:underline font-medium"
+            >
               Sign in
             </Link>
           </p>

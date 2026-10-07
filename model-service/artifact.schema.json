@@ -1,0 +1,148 @@
+{
+  "$defs": {
+    "Term": {
+      "additionalProperties": false,
+      "properties": {
+        "feature": {
+          "title": "Feature",
+          "type": "string"
+        },
+        "coefficient": {
+          "title": "Coefficient",
+          "type": "number"
+        },
+        "mean": {
+          "title": "Mean",
+          "type": "number"
+        },
+        "scale": {
+          "exclusiveMinimum": 0,
+          "title": "Scale",
+          "type": "number"
+        },
+        "impute": {
+          "title": "Impute",
+          "type": "number"
+        },
+        "missing_coefficient": {
+          "default": 0,
+          "title": "Missing Coefficient",
+          "type": "number"
+        }
+      },
+      "required": [
+        "feature",
+        "coefficient",
+        "mean",
+        "scale",
+        "impute"
+      ],
+      "title": "Term",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "delirium-watch.logistic.v1",
+      "title": "Format",
+      "type": "string"
+    },
+    "feature_schema_version": {
+      "const": "delirium-watch.features.v1",
+      "title": "Feature Schema Version",
+      "type": "string"
+    },
+    "model_version": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Model Version",
+      "type": "string"
+    },
+    "target": {
+      "enum": [
+        "incident_delirium",
+        "current_delirium"
+      ],
+      "title": "Target",
+      "type": "string"
+    },
+    "horizon_hours": {
+      "maximum": 168,
+      "minimum": 0,
+      "title": "Horizon Hours",
+      "type": "number"
+    },
+    "window_hours": {
+      "maximum": 168,
+      "minimum": 1,
+      "title": "Window Hours",
+      "type": "integer"
+    },
+    "intercept": {
+      "title": "Intercept",
+      "type": "number"
+    },
+    "terms": {
+      "items": {
+        "$ref": "#/$defs/Term"
+      },
+      "minItems": 1,
+      "title": "Terms",
+      "type": "array"
+    },
+    "min_movement_coverage": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Min Movement Coverage",
+      "type": "number"
+    },
+    "min_heart_rate_minute_coverage": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Min Heart Rate Minute Coverage",
+      "type": "number"
+    },
+    "max_event_age_hours": {
+      "exclusiveMinimum": 0,
+      "maximum": 168,
+      "title": "Max Event Age Hours",
+      "type": "number"
+    },
+    "required_features": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Required Features",
+      "type": "array"
+    },
+    "training_description": {
+      "minLength": 1,
+      "title": "Training Description",
+      "type": "string"
+    },
+    "validation_description": {
+      "minLength": 1,
+      "title": "Validation Description",
+      "type": "string"
+    }
+  },
+  "required": [
+    "format",
+    "feature_schema_version",
+    "model_version",
+    "target",
+    "horizon_hours",
+    "window_hours",
+    "intercept",
+    "terms",
+    "min_movement_coverage",
+    "min_heart_rate_minute_coverage",
+    "max_event_age_hours",
+    "required_features",
+    "training_description",
+    "validation_description"
+  ],
+  "title": "Artifact",
+  "type": "object"
+}

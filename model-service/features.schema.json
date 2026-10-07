@@ -1,0 +1,58 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "delirium-watch.features.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "as_of_ms": {
+      "exclusiveMinimum": 0,
+      "title": "As Of Ms",
+      "type": "integer"
+    },
+    "window_start_ms": {
+      "exclusiveMinimum": 0,
+      "title": "Window Start Ms",
+      "type": "integer"
+    },
+    "window_hours": {
+      "maximum": 168,
+      "minimum": 1,
+      "title": "Window Hours",
+      "type": "integer"
+    },
+    "values": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "title": "Values",
+      "type": "object"
+    },
+    "quality": {
+      "additionalProperties": true,
+      "title": "Quality",
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "as_of_ms",
+    "window_start_ms",
+    "window_hours",
+    "values",
+    "quality"
+  ],
+  "title": "Features",
+  "type": "object"
+}

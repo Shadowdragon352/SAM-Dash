@@ -4,9 +4,9 @@
   "main": "server/src/index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "cd client && npm install && npm run build",
-    "start": "cd client && npm run dev",
+    "test": "node --test server/tests/*.test.js",
+    "build": "npm --prefix client ci && npm --prefix client run build",
+    "start": "node server/src/index.js",
     "server": "nodemon server/src/index.js",
     "client": "cd client && npm run dev",
     "dev": "concurrently \"npm run server\" \"npm run client\""

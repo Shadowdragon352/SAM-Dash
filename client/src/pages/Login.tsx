@@ -1,9 +1,15 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Mail } from "lucide-react";
 
@@ -23,7 +29,7 @@ const Login = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    login(formData)
+    login(formData);
   };
 
   return (
@@ -31,10 +37,12 @@ const Login = () => {
       <div className="absolute top-4 right-4">
         <ThemeToggle />
       </div>
-      
+
       <Card className="w-full max-w-md border-border shadow-lg">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold tracking-tight">Sign in</CardTitle>
+          <CardTitle className="text-2xl font-bold tracking-tight">
+            Sign in
+          </CardTitle>
           <CardDescription className="text-muted-foreground">
             Enter your credentials to access your dashboard
           </CardDescription>
@@ -44,12 +52,14 @@ const Login = () => {
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
-                <Input 
-                  id="email" 
-                  type="email" 
-                  placeholder="name@example.com" 
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="name@example.com"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
                   className="pl-10"
                   required
                 />
@@ -59,22 +69,21 @@ const Login = () => {
             <div className="space-y-2">
               <div className="flex justify-between">
                 <Label htmlFor="password">Password</Label>
-                <Link to="/forgot-password" className="text-sm text-primary hover:underline">
-                  Forgot password?
-                </Link>
               </div>
               <div className="relative">
-                <Input 
-                  id="password" 
-                  type={showPassword ? "text" : "password"} 
-                  placeholder="••••••••" 
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
                   className="pl-10"
                   required
                 />
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className="absolute right-3 top-3 text-muted-foreground"
                   onClick={() => setShowPassword(!showPassword)}
                 >
@@ -94,7 +103,10 @@ const Login = () => {
         <CardFooter className="flex justify-center">
           <p className="text-center text-sm text-muted-foreground">
             Don't have an account?{" "}
-            <Link to="/signup" className="text-primary hover:underline font-medium">
+            <Link
+              to="/signup"
+              className="text-primary hover:underline font-medium"
+            >
               Create account
             </Link>
           </p>

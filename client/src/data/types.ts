@@ -10,6 +10,9 @@ export interface Patient {
   condition?: string;
   additionalInfo?: string;
   location?: {
+    city?: string;
+    state?: string;
+    zipCode?: string;
     address: string;
     coordinates: { lat: number; lng: number };
     inHospital: boolean;

@@ -1,0 +1,26 @@
+# Overlay this onto your existing compose.yaml to preserve its storage/ports/tunnel.
+services:
+  api:
+    environment:
+      INGEST_TOKEN: ${INGEST_TOKEN:-}
+      REGISTRATION_CODE: ${REGISTRATION_CODE:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      MODEL_URL: ${MODEL_URL:-}
+      MODEL_API_TOKEN: ${MODEL_API_TOKEN:-}
+  model:
+    profiles: [model]
+    build:
+      context: .
+      dockerfile: model-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      MODEL_API_TOKEN: ${MODEL_API_TOKEN:?Run docker/init-config.mjs}
+      MODEL_FILE: /models/model.json
+    volumes:
+      - ./model-service/models:/models:ro
+    networks: [application]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5

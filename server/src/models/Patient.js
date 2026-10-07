@@ -5,10 +5,11 @@ const patientSchema = new mongoose.Schema(
     fullName: {
       type: String,
       trim: true,
+      required: true,
     },
     avatar: {
       type: String,
-      default: "https://randomuser.me/api/portraits/lego/1.jpg", // Default avatar URL
+      default: "",
     },
     gender: {
       type: String,
@@ -47,8 +48,8 @@ const patientSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["normal", "warning", "critical"],
-      default: "normal",
+      enum: ["unknown", "normal", "warning", "critical"],
+      default: "unknown",
     },
     location: {
       address: String, // e.g., "123 Main St, Springfield, IL, USA" or specific facility name
@@ -58,7 +59,7 @@ const patientSchema = new mongoose.Schema(
       },
       inHospital: {
         type: Boolean,
-        default: false,
+        default: undefined,
       },
     },
     age: {

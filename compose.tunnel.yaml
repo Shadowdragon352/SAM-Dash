@@ -1,0 +1,20 @@
+# Use alongside compose.yaml for a permanent Cloudflare-managed tunnel.
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: [tunnel, --no-autoupdate, --protocol, http2, run, --token-file, /run/secrets/cloudflared_token]
+    secrets:
+      - cloudflared_token
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      - application
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+
+secrets:
+  cloudflared_token:
+    file: ./secrets/cloudflared-token.txt

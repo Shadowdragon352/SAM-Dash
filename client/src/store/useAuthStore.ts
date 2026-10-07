@@ -22,6 +22,7 @@ interface AuthUser {
 }
 
 interface SignupData {
+  registrationCode: string;
   fullName: string;
   email: string;
   password: string;
@@ -58,20 +59,7 @@ interface AuthStore {
 }
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
-  authUser: {
-    id: "",
-    fullName: "Dr. Tamirat Kebede", // Default name for the auth user
-    email: "tamirat@gmail.com",
-    role: "doctor", // Default role for the auth user
-    department: "Cardiology", // Default department for the auth user
-    specialty: "Cardiologist", // Default specialty for the auth user
-    avatarUrl: "https://randomuser.me/api/portraits/men/32.jpg", // Optional field for user avatar
-    phoneNumber: "", // Optional field for user phone number
-    bio: "",
-    age: 0, // Optional field for user age
-    experience: 0, // Optional field for user experience
-    education: "", // Optional field for user education
-  },
+  authUser: null,
   user: null,
   isSigningUp: false,
   isLoggingIn: false,

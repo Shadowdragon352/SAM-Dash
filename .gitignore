@@ -22,3 +22,16 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+
+.env
+.env.*
+!.env.example
+secrets/
+backups/
+data/
+mongo-data/
+node_modules/
+client/dist/
+*.zip
+compose.before-integration.yaml

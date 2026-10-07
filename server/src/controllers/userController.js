@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 // Optional: Import Patient and Doctor models if you want to populate linked profiles
 // import Patient from '../models/Patient.js';
@@ -67,7 +68,7 @@ export const updateMe = async (req, res) => {
       if (password.length < 6) { // Example: Minimum password length validation
           return res.status(400).json({ message: 'Password must be at least 6 characters long.'})
       }
-      user.password = password;
+      user.password = await bcrypt.hash(password, 10);
     }
 
     const updatedUser = await user.save();

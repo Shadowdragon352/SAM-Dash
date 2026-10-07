@@ -1,0 +1,14 @@
+# Temporary public demo URL; do not run together with compose.tunnel.yaml.
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: [tunnel, --no-autoupdate, --protocol, http2, --url, http://web:8080]
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      - application
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}

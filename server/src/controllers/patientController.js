@@ -1,150 +1,104 @@
-import Patient from '../models/Patient.js';
-
-// @desc    Create a new patient profile
-// @route   POST /api/v1/patients
-// @access  Private (Requires admin or doctor role - to be enforced by authorize middleware in routes)
-export const createPatient = async (req, res, next) => {
-  const {
-    name,
-    age,
-    gender,
-    contactInfo,
-    medicalHistorySummary,
-    emergencyContact,
-    status,
-    location,
-    room,
-    condition,
-    additionalInfo
-  } = req.body;
-
-  try {
-    const patient = new Patient({
-      fullName: name, // Assuming 'name' is a string like "John Doe"
-      age,
-      gender,
-      contactInfo,
-      medicalHistorySummary,
-      emergencyContact,
-      status,
-      location,
-      room,
-      condition,
-      additionalInfo,
-      
-
-    });
-    console.log("Creating patient with data:", patient);
-
-    const createdPatient = await patient.save();
-    res.status(201).json(createdPatient);
-  } catch (error) {
-    next(error)
+import mongoose from "mongoose";
+import Patient from "../models/Patient.js";
+import { Device } from "../delirium/models.js";
+import { fail } from "../delirium/contract.js";
+const allowed = [
+  "age",
+  "gender",
+  "contactInfo",
+  "medicalHistorySummary",
+  "emergencyContact",
+  "location",
+  "room",
+  "condition",
+  "additionalInfo",
+  "recentVisits",
+];
+function fields(body) {
+  const result = {};
+  if (body.name !== undefined || body.fullName !== undefined) {
+    const name = body.name ?? body.fullName;
+    if (typeof name !== "string" || !name.trim() || name.trim().length > 200)
+      fail("Patient name is required (up to 200 characters)");
+    result.fullName = name.trim();
   }
-};
-
-// @desc    Get all patients with pagination and search
-// @route   GET /api/v1/patients
-// @access  Private (Requires admin or doctor role)
-export const getAllPatients = async (req, res, next) => {
-  const { page = 1, limit = 10, search = '' } = req.query;
-  const query = {};
-
-  if (search) {
-    query.$or = [
-      { name: { $regex: search, $options: 'i' } },
-      { 'contactInfo.phone': { $regex: search, $options: 'i' } },
-    ];
-  }
-
+  for (const key of allowed)
+    if (body[key] !== undefined) result[key] = body[key];
+  return result;
+}
+function id(value) {
+  if (!mongoose.isValidObjectId(value)) fail("Invalid patient ID");
+  return value;
+}
+export async function createPatient(req, res, next) {
   try {
-    const patients = await Patient.find(query)
-      .populate('userId', 'firstName lastName email role avatarUrl') // Populate user details
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .exec();
-
-    const count = await Patient.countDocuments(query);
-
+    const data = fields(req.body);
+    if (!data.fullName) fail("Patient name is required");
+    res.status(201).json(await Patient.create(data));
+  } catch (e) {
+    next(e);
+  }
+}
+export async function getAllPatients(req, res, next) {
+  try {
+    const page = Math.max(1, Math.min(100000, parseInt(req.query.page) || 1)),
+      limit = Math.max(1, Math.min(200, parseInt(req.query.limit) || 50));
+    const search = String(req.query.search || "")
+      .slice(0, 200)
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const query = search ? { fullName: { $regex: search, $options: "i" } } : {};
+    const [patients, count] = await Promise.all([
+      Patient.find(query)
+        .sort({ fullName: 1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Patient.countDocuments(query),
+    ]);
     res.json({
       patients,
       totalPages: Math.ceil(count / limit),
-      currentPage: parseInt(page),
+      currentPage: page,
       totalPatients: count,
     });
-  } catch (error) {
-    next(error);
+  } catch (e) {
+    next(e);
   }
-};
-
-// @desc    Get a single patient by ID
-// @route   GET /api/v1/patients/:id
-// @access  Private (Patient can see their own, or Admin/Doctor)
-export const getPatientById = async (req, res, next) => {
+}
+export async function getPatientById(req, res, next) {
   try {
-    const patient = await Patient.findById(req.params.id);
-
-    if (!patient) {
-      return res.status(404).json({ message: 'Patient not found.' });
-    }
-
+    const patient = await Patient.findById(id(req.params.id));
+    if (!patient) fail("Patient not found", 404);
     res.json(patient);
-  } catch (error) {
-    next(error);
+  } catch (e) {
+    next(e);
   }
-};
-
-// @desc    Update a patient's profile
-// @route   PUT /api/v1/patients/:id
-// @access  Private (Patient can update their own, or Admin/Doctor)
-export const updatePatient = async (req, res, next) => {
+}
+export async function updatePatient(req, res, next) {
   try {
-    const patient = await Patient.findById(req.params.id);
-
-    if (!patient) {
-      return res.status(404).json({ message: 'Patient not found.' });
-    }
-
-    // Update fields from req.body
-    const { userId, ...updateData } = req.body;
-
-    Object.keys(updateData).forEach((key) => {
-        // Check for nested objects like contactInfo, location, emergencyContact
-        if (typeof updateData[key] === 'object' && patient[key] && typeof patient[key] === 'object') {
-            Object.keys(updateData[key]).forEach(nestedKey => {
-                if (patient[key][nestedKey] !== undefined) { // only update existing nested fields
-                    patient[key][nestedKey] = updateData[key][nestedKey];
-                }
-            });
-        } else if (patient[key] !== undefined) { // only update existing top-level fields
-            patient[key] = updateData[key];
-        }
-    });
-
-    const updatedPatient = await patient.save();
-    const populatedPatient = await Patient.findById(updatedPatient._id).populate('userId', 'firstName lastName email role avatarUrl');
-
-    res.json(populatedPatient);
-  } catch (error) {
-    next(error);
+    const patient = await Patient.findByIdAndUpdate(
+      id(req.params.id),
+      { $set: fields(req.body) },
+      { new: true, runValidators: true },
+    );
+    if (!patient) fail("Patient not found", 404);
+    res.json(patient);
+  } catch (e) {
+    next(e);
   }
-};
-
-// @desc    Delete a patient profile
-// @route   DELETE /api/v1/patients/:id
-// @access  Private (Requires Admin role)
-export const deletePatient = async (req, res) => {
+}
+export async function deletePatient(req, res, next) {
   try {
-    const patient = await Patient.findById(req.params.id);
-
-    if (!patient) {
-      return res.status(404).json({ message: 'Patient not found.' });
-    }
-
+    const patient = await Patient.findById(id(req.params.id));
+    if (!patient) fail("Patient not found", 404);
+    if (await Device.exists({ "assignments.patientId": patient._id }))
+      fail(
+        "This patient has device history. Retain the patient to preserve attribution.",
+        409,
+      );
     await patient.deleteOne();
-
-    res.status(204).send();
-  } catch (error) {
-    next(error);
+    res.status(204).end();
+  } catch (e) {
+    next(e);
   }
-};
+}

@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema(
     },
     avatarUrl: {
       type: String,
-      default:"https://randomuser.me/api/portraits/lego/1.jpg"
+      default:""
     },
     bio: {
       type: String,

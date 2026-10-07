@@ -3,58 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Notification } from '../components/notifications/NotificationPanel';
 
 // Sample notifications
-const initialNotifications: Notification[] = [
-  {
-    id: '1',
-    title: 'New message from Dr. Sarah',
-    description: 'Hello! I just reviewed your latest test results and everything looks good. Let me know if you have any questions.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 15),
-    read: false,
-    type: 'message',
-    sender: {
-      id: 'doc-1',
-      name: 'Dr. Sarah Johnson',
-      avatar: 'https://randomuser.me/api/portraits/women/32.jpg',
-    }
-  },
-  {
-    id: '2',
-    title: 'Critical patient alert',
-    description: 'Patient John Doe in Room 302 has abnormal vital signs. Requires immediate attention.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 45),
-    read: false,
-    type: 'alert',
-  },
-  {
-    id: '3',
-    title: 'System update completed',
-    description: 'The system has been updated to version 2.3.0. View the changelog for details on new features.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3),
-    read: true,
-    type: 'update',
-  },
-  {
-    id: '4',
-    title: 'Appointment reminder',
-    description: 'You have a video consultation with Dr. Michael Lee tomorrow at 10:00 AM.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5),
-    read: true,
-    type: 'appointment',
-  },
-  {
-    id: '5',
-    title: 'New message from Emma',
-    description: 'When is my next appointment scheduled for? I need to confirm if I can make it.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 8),
-    read: false,
-    type: 'message',
-    sender: {
-      id: 'pat-1',
-      name: 'Emma Wilson',
-      avatar: 'https://randomuser.me/api/portraits/women/22.jpg',
-    }
-  }
-];
+const initialNotifications: Notification[] = [];
 
 interface NotificationContextType {
   notifications: Notification[];

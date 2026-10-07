@@ -1,19 +1,24 @@
+import { secretMatches, hashToken } from '../delirium/contract.js';
 import bcrypt from "bcryptjs";
 import User from "../models/User.js";
 import AppError from "../utils/AppError.js";
 import  generateToken  from "../utils/generateToken.js";
 export const signup = async (req, res, next) => {
   try {
-    const { fullName, email, password, role, department, specialty } = req.body;
+    const { fullName, password, department, specialty } = req.body;
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!process.env.REGISTRATION_CODE || !secretMatches(String(req.body.registrationCode || ''), hashToken(process.env.REGISTRATION_CODE))) {
+      return next(new AppError('A valid registration code from the server operator is required', 403));
+    }
     // check if user already exists
     // check all find is provided
-    if (!fullName || !email || !password) {
+    if (typeof fullName !== 'string' || !fullName.trim() || fullName.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !password) {
       return next(new AppError("Please provide all fields", 400));
     }
     // check if password is strong
-    if (password.length < 6) {
+    if (typeof password !== 'string' || password.length < 8 || password.length > 256) {
       return next(
-        new AppError("Password must be at least 6 characters long", 400)
+        new AppError("Password must be at least 8 characters long", 400)
       );
     }
     const userExists = await User.findOne({ email });
@@ -21,17 +26,15 @@ export const signup = async (req, res, next) => {
       return next(new AppError("User already exists", 400));
     }
     // hash password
-    const salt = bcrypt.genSaltSync(10);
-    const hashedPassword = bcrypt.hashSync(password, salt);
+    const hashedPassword = await bcrypt.hash(password, 10);
     // create user
     const user = new User({
       fullName,
       email,
       password: hashedPassword,
-      role: role || "doctor", // default role is doctor
+      role: "doctor", // default role is doctor
       department: department || "",
       specialty: specialty || "",
-      profilePic: "https://randomuser.me/api/portraits/lego/1.jpg", // default profile pic
     });
     // save user to db
     // verify email 
@@ -48,9 +51,9 @@ export const signup = async (req, res, next) => {
     res
       .cookie("token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        samesite: "strict",
+        secure: process.env.COOKIE_SECURE === 'true',
+        maxAge: 60 * 60 * 1000,
+        sameSite: "strict",
       })
       .status(201)
       .json({
@@ -65,9 +68,10 @@ export const signup = async (req, res, next) => {
 
 export const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     // check email and password are provided
-    if (!email || !password) {
+    if (!email || typeof password !== 'string' || !password || password.length > 256) {
       return next(new AppError("Please provide all fields", 400));
     }
     // check if user exists
@@ -77,7 +81,7 @@ export const login = async (req, res, next) => {
       return next(new AppError("Wrong email or password", 400));
     }
     // check if password is correct
-    const isPasswordCorrect = bcrypt.compareSync(password, userExists.password);
+    const isPasswordCorrect = await bcrypt.compare(password, userExists.password);
     if (!isPasswordCorrect) {
       return next(new AppError("Wrong email or password", 400));
     }
@@ -89,9 +93,9 @@ export const login = async (req, res, next) => {
     res
       .cookie("token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        samesite: "strict",
+        secure: process.env.COOKIE_SECURE === 'true',
+        maxAge: 60 * 60 * 1000,
+        sameSite: "strict",
       })
       .status(200)
       .json({
@@ -110,9 +114,9 @@ export const logout = async (req, res, next) => {
     res
       .clearCookie("token", {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        samesite: "strict",
+        secure: process.env.COOKIE_SECURE === 'true',
+        maxAge: 60 * 60 * 1000,
+        sameSite: "strict",
       })
       .status(200)
       .json({

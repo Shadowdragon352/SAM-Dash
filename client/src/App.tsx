@@ -2,56 +2,57 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import { Loader } from "lucide-react";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
-import DoctorProfilePage from "./pages/DoctorProfilePage";
-import Settings from "./pages/Settings";
-import Messages from "./pages/Messages";
 import { ThemeProvider } from "./components/ThemeProvider";
-import { NotificationProvider } from "./contexts/NotificationContext";
 import { useAuthStore } from "./store/useAuthStore";
 import { useEffect } from "react";
 
 const queryClient = new QueryClient();
 
 const App = () => {
-  const {authUser, checkAuth, isCheckingAuth} = useAuthStore();
-    // useEffect(()=>{
-    //   checkAuth();
-    // }, [checkAuth]);
-    // if(isCheckingAuth && !authUser){
-    //   return (
-    //     <div className="flex justify-center items-center h-screen">
-    //       <Loader className="size-10 animate-spin" />
-    //     </div>
-    //   )
-    // }
-    console.log("Auth User:", authUser);
+  const { authUser, checkAuth, isCheckingAuth } = useAuthStore();
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+  if (isCheckingAuth)
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <Loader className="size-10 animate-spin" />
+      </div>
+    );
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <NotificationProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={ <Index/> } />
-                <Route path="/login" element={ <Login/>} />
-                <Route path="/signup" element={<SignUp/> } />
-                <Route path="/profile" element={<DoctorProfilePage />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/messages" element={<Messages />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </NotificationProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  authUser ? <Index /> : <Navigate to="/login" replace />
+                }
+              />
+              <Route
+                path="/login"
+                element={authUser ? <Navigate to="/" replace /> : <Login />}
+              />
+              <Route
+                path="/signup"
+                element={authUser ? <Navigate to="/" replace /> : <SignUp />}
+              />
+
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );
