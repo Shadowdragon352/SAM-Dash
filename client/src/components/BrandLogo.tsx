@@ -6,9 +6,10 @@ export default function BrandLogo({ className = "" }: { className?: string }) {
       viewBox="575 725 850 550"
       role="img"
       aria-label="SAM Patient Monitoring Tool"
-      className={`block shrink-0 rounded-lg bg-[#0c1f2e] ${className}`}
+      className={`block shrink-0 rounded-sm bg-[#0c1f2e] ${className}`}
     >
       <image href="/sam-logo.png" width="2000" height="2000" />
     </svg>
   );
 }
+

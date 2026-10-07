@@ -1,11 +1,13 @@
 import BrandLogo from "@/components/BrandLogo";
+import PatientDirectory, { type PatientSummary } from "@/components/PatientDirectory";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity,
+  ArrowLeft,
+  X,
   Brain,
   Heart,
   Link2,
-  Plus,
   RefreshCw,
   Thermometer,
   Watch,
@@ -23,14 +25,7 @@ import { axiosInstance as api } from "@/lib/axios";
 import { useAuthStore } from "@/store/useAuthStore";
 import ThemeToggle from "@/components/ThemeToggle";
 
-type Patient = {
-  _id: string;
-  fullName: string;
-  age?: number;
-  gender?: string;
-  room?: string;
-  condition?: string;
-};
+type Patient = PatientSummary;
 type Assignment = {
   _id: string;
   patientId: string;
@@ -120,12 +115,10 @@ const errorMessage = (e: unknown) => {
   };
   return error.response?.data?.message || error.message || "Request failed";
 };
-const input = "w-full rounded-md border bg-background px-3 py-2 text-sm";
-const button =
-  "rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50";
-const secondary =
-  "rounded-md border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50";
-const panel = "rounded-xl border bg-card p-5 shadow-sm";
+const input = "sam-input";
+const button = "sam-button";
+const secondary = "sam-secondary";
+const panel = "rounded-md border bg-card p-5";
 function localTime() {
   const d = new Date();
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
@@ -179,7 +172,7 @@ function Chart({
               <Line
                 type="linear"
                 dataKey={metric}
-                stroke="#168c98"
+                stroke="hsl(var(--primary))"
                 strokeWidth={2}
                 dot={false}
                 connectNulls={false}
@@ -203,6 +196,9 @@ export default function Index() {
     [search, setSearch] = useState(""),
     [page, setPage] = useState(1),
     [pages, setPages] = useState(1);
+  const [activePatient, setActivePatient] = useState<Patient | null>(null);
+  const [patientCount, setPatientCount] = useState(0);
+  const [patientsLoading, setPatientsLoading] = useState(true);
   const [devices, setDevices] = useState<Device[]>([]),
     [data, setData] = useState<Overview | null>(null),
     [cognition, setCognition] = useState<Event[]>([]),
@@ -235,27 +231,36 @@ export default function Index() {
     trialRequest = useRef(0);
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
-  const activePatient = patients.find((p) => p._id === selected);
   const loadPatients = useCallback(async () => {
     const request = ++patientRequest.current;
-    const response = await api.get("/patients", {
-      params: { search, page, limit: 100 },
-    });
-    if (request !== patientRequest.current) return;
-    setPatients(response.data.patients);
-    setPages(response.data.totalPages || 1);
-    setSelected((current) =>
-      response.data.patients.some((p: Patient) => p._id === current)
-        ? current
-        : response.data.patients[0]?._id || "",
-    );
+    setPatientsLoading(true);
+    try {
+      const response = await api.get("/patients", {
+        params: { search, page, limit: 100 },
+      });
+      if (request !== patientRequest.current) return;
+      setPatients(response.data.patients);
+      setPatientCount(response.data.totalPatients);
+      const lastPage = Math.max(1, response.data.totalPages || 1);
+      setPages(lastPage);
+      if (page > lastPage) setPage(lastPage);
+    } finally {
+      if (request === patientRequest.current) setPatientsLoading(false);
+    }
   }, [search, page]);
+  const invalidatePatientRequests = useCallback(() => {
+    patientRequest.current++;
+  }, []);
   useEffect(() => {
+    setPatientsLoading(true);
     const timer = setTimeout(() => {
       loadPatients().catch((e) => setError(errorMessage(e)));
     }, 250);
-    return () => clearTimeout(timer);
-  }, [loadPatients]);
+    return () => {
+      clearTimeout(timer);
+      invalidatePatientRequests();
+    };
+  }, [loadPatients, invalidatePatientRequests]);
   const refresh = useCallback(async () => {
     const id = selected;
     const response = await api.get("/research/devices");
@@ -277,13 +282,17 @@ export default function Index() {
     setSession("");
     setTrials([]);
     setChosenDevice("");
+    setBuffered(false);
     setToken("");
     setStudy("");
-    setError("");
+    setScore("");
+    setNotes("");
+    setClinicalState("uncertain");
+    setAssessmentTime(localTime());
     let active = true,
       running = false;
     const poll = async () => {
-      if (running) return;
+      if (!active || running) return;
       running = true;
       try {
         await refresh();
@@ -325,8 +334,7 @@ export default function Index() {
         ? await api.put(`/patients/${selected}`, body)
         : await api.post("/patients", body);
       patientRequest.current++;
-      setSearch(response.data.fullName);
-      setPage(1);
+      setActivePatient(response.data);
       setPatients((current) => [
         ...current.filter((p) => p._id !== response.data._id),
         response.data,
@@ -334,9 +342,9 @@ export default function Index() {
       setSelected(response.data._id);
       setNewPatient(false);
       setEditing(false);
-      setMessage(
-        "Patient saved. Measurements appear after a device is linked and sends data.",
-      );
+      setMessage(editing ? "Patient details updated." : "Patient created. Link a device to start collecting measurements.");
+      void loadPatients().catch(() => setError("Patient saved, but the directory could not refresh. Try again."));
+      window.scrollTo({ top: 0 });
     });
   }
   async function showTrials(row: Event) {
@@ -369,6 +377,42 @@ export default function Index() {
       if (trialRequest.current === request) setTrialsLoading(false);
     }
   }
+  function showHome() {
+    if (busy) return;
+    setSelected("");
+    setActivePatient(null);
+    setNewPatient(false);
+    setEditing(false);
+    setError("");
+    setMessage("");
+    window.scrollTo({ top: 0 });
+  }
+  function openPatient(patient: Patient) {
+    if (busy) return;
+    setData(null);
+    setCognition([]);
+    setSelected(patient._id);
+    setActivePatient(patient);
+    setNewPatient(false);
+    setEditing(false);
+    setError("");
+    setMessage("");
+    window.scrollTo({ top: 0 });
+  }
+  function createPatient() {
+    if (busy) return;
+    setSelected("");
+    setActivePatient(null);
+    setNewPatient(true);
+    setEditing(false);
+    setName("");
+    setAge("");
+    setRoom("");
+    setGender("");
+    setError("");
+    setMessage("");
+    window.scrollTo({ top: 0 });
+  }
   const linked = devices.filter((d) =>
     d.assignments.some((a) => a.patientId === selected && a.to === null),
   );
@@ -380,103 +424,57 @@ export default function Index() {
     exportUrl = `${api.defaults.baseURL}/research/patients/${selected}/export?from=${now - 7 * 86400000}&to=${now}`;
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b bg-background px-4 py-1.5">
-        <div className="flex items-center gap-2">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b bg-card px-4 py-1.5 sm:px-6">
+        <button disabled={busy} onClick={showHome} aria-label="Patient home" className="flex items-center gap-2 text-left">
           <BrandLogo className="w-16 sm:w-20" />
           <div>
             <h1 className="text-base font-semibold">SAM</h1>
             <p className="text-xs text-muted-foreground">
-              Patient monitoring · Research workspace
+              Patient monitoring
             </p>
           </div>
-        </div>
+        </button>
         <div className="flex items-center gap-3 text-sm">
-          <span>{authUser?.fullName}</span>
+          <span className="hidden text-muted-foreground sm:inline">{authUser?.fullName}</span>
           <ThemeToggle />
           <button className={secondary} onClick={() => void logout()}>
             Sign out
           </button>
         </div>
       </header>
-      <div className="mx-auto grid max-w-[1600px] gap-5 p-4 lg:grid-cols-[260px_minmax(0,1fr)] lg:p-6">
-        <aside className={panel + " h-fit"}>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold">Patients</h2>
-            <button
-              aria-label="Add patient"
-              className={secondary}
-              onClick={() => {
-                setNewPatient(true);
-                setEditing(false);
-                setName("");
-                setAge("");
-                setRoom("");
-                setGender("");
-              }}
-            >
-              <Plus size={16} />
+      <div className={`mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8 ${activePatient && !newPatient ? "grid gap-8 lg:grid-cols-[200px_minmax(0,1fr)]" : ""}`}>
+        {activePatient && !newPatient && (
+          <aside className="h-fit lg:sticky lg:top-6">
+            <button disabled={busy} className="sam-secondary w-full justify-start" onClick={showHome}>
+              <ArrowLeft size={16} /> All patients
             </button>
-          </div>
-          <input
-            aria-label="Search patients"
-            className={input}
-            placeholder="Search by name"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-          />
-          <nav className="mt-3 max-h-[65vh] space-y-1 overflow-auto">
-            {patients.map((p) => (
-              <button
-                key={p._id}
-                className={`w-full rounded-lg p-3 text-left ${selected === p._id ? "bg-teal-700 text-white" : "hover:bg-muted"}`}
-                onClick={() => setSelected(p._id)}
-              >
-                <span className="block font-medium">{p.fullName}</span>
-                <span className="text-xs opacity-75">
-                  {p.room ? `Room ${p.room}` : "Room not recorded"}
-                  {p.age != null ? ` · ${p.age} years` : ""}
-                </span>
-              </button>
-            ))}
-            {!patients.length && (
-              <p className="py-6 text-sm text-muted-foreground">
-                No patients found. Add a patient to begin.
-              </p>
-            )}
-          </nav>
-          {pages > 1 && (
-            <div className="mt-4 flex justify-between text-xs">
-              <button
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                Previous
-              </button>
-              <span>
-                {page}/{pages}
-              </span>
-              <button
-                disabled={page >= pages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next
-              </button>
+            <div className="my-5 border-b pb-5">
+              <p className="text-sm font-semibold">{activePatient.fullName}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{activePatient.room ? `Room ${activePatient.room}` : "Room not recorded"}</p>
             </div>
-          )}
-        </aside>
-        <main className="min-w-0 space-y-5">
+            <nav aria-label="Patient sections" className="flex flex-wrap gap-1 lg:flex-col">
+              {[
+                ["overview", "Measurements"],
+                ["devices", "Device links"],
+                ["cognition", "Cognition tests"],
+                ["assessments", "Clinical assessments"],
+                ["export", "Export data"],
+              ].map(([id, label]) => (
+                <a key={id} href={`#${id}`} className="rounded-sm px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">{label}</a>
+              ))}
+            </nav>
+          </aside>
+        )}
+        <main className="min-w-0 space-y-6">
           {error && (
             <div
               role="alert"
-              className="rounded-lg border border-red-400 bg-red-500/10 p-4 text-sm"
+              className="rounded-sm border-l-2 border-red-600 bg-card px-4 py-3 text-sm"
             >
               {error}{" "}
               <button
                 className="ml-3 underline"
-                onClick={() => void action(refresh)}
+                onClick={() => void action(async () => { await loadPatients(); await refresh(); })}
               >
                 Retry
               </button>
@@ -485,21 +483,45 @@ export default function Index() {
           {message && (
             <div
               role="status"
-              className="rounded-lg border border-teal-600 bg-teal-500/10 p-4 text-sm"
+              className="flex items-start justify-between gap-3 rounded-sm border-l-2 border-primary bg-card px-4 py-3 text-sm"
             >
-              {message}
+              <span>{message}</span>
+              <button aria-label="Dismiss message" onClick={() => setMessage("")}><X size={16} /></button>
             </div>
           )}
+          {!activePatient && !newPatient && (
+            <PatientDirectory
+              patients={patients}
+              total={patientCount}
+              loading={patientsLoading}
+              search={search}
+              page={page}
+              pages={pages}
+              onSearch={(value) => { setSearch(value); setPage(1); }}
+              onPage={setPage}
+              onOpen={openPatient}
+              onCreate={createPatient}
+              deviceLabels={(id) => devices.filter((d) => d.assignments.some((a) => a.patientId === id && a.to === null)).map((d) => d.label || d.deviceId)}
+            />
+          )}
           {newPatient && (
-            <form onSubmit={savePatient} className={panel}>
-              <h2 className="mb-4 font-semibold">
-                {editing ? "Edit patient" : "Add patient"}
-              </h2>
+            <section className="mx-auto max-w-3xl space-y-5">
+              <button disabled={busy} className="sam-secondary" onClick={() => setNewPatient(false)}>
+                <ArrowLeft size={16} /> {editing ? "Back to patient" : "All patients"}
+              </button>
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight">{editing ? "Edit patient" : "Add a patient"}</h2>
+                <p className="mt-2 text-sm text-muted-foreground">{editing ? "Update the details for this patient." : "Create the patient record first. You can link a watch from their workspace afterward."}</p>
+              </div>
+              <form onSubmit={savePatient} className={panel}>
+              <h3 className="mb-5 border-b pb-3 text-sm font-medium">Patient details</h3>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="text-sm">
                   Patient name
                   <input
                     required
+                    autoFocus
+                    autoComplete="off"
                     maxLength={200}
                     className={input}
                     value={name}
@@ -541,10 +563,11 @@ export default function Index() {
               </div>
               <div className="mt-4 flex gap-2">
                 <button disabled={busy} className={button}>
-                  Save patient
+                  {busy ? "Saving…" : editing ? "Save changes" : "Create patient"}
                 </button>
                 <button
                   type="button"
+                  disabled={busy}
                   className={secondary}
                   onClick={() => setNewPatient(false)}
                 >
@@ -552,12 +575,13 @@ export default function Index() {
                 </button>
               </div>
             </form>
+            </section>
           )}
-          {activePatient && (
+          {activePatient && !newPatient && (
             <>
-              <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-5">
                 <div>
-                  <h2 className="text-2xl font-semibold">
+                  <h2 className="text-2xl font-semibold tracking-tight">
                     {activePatient.fullName}
                   </h2>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -566,8 +590,9 @@ export default function Index() {
                     {linked.length !== 1 ? "s" : ""} · Last 24 hours
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
+                    disabled={busy}
                     className={secondary}
                     onClick={() => {
                       setEditing(true);
@@ -588,9 +613,162 @@ export default function Index() {
                     <RefreshCw size={16} className="inline mr-2" />
                     Refresh
                   </button>
+                  <button disabled={busy} className={secondary} onClick={showHome}>
+                    <X size={16} /> Close patient
+                  </button>
                 </div>
               </div>
-              <section className={panel}>
+              {!data && (
+                <p id="overview" className="text-sm text-muted-foreground">
+                  Loading recorded data…
+                </p>
+              )}
+              {data && (
+                <>
+                  {data.truncated && (
+                    <p
+                      role="alert"
+                      className="rounded-md border border-amber-500 p-3 text-sm"
+                    >
+                      The event limit was reached. This view is partial;
+                      prediction is disabled. Export events for complete data.
+                    </p>
+                  )}
+                  <div id="overview" className="grid gap-0 overflow-hidden rounded-md border bg-card sm:grid-cols-2 xl:grid-cols-4">
+                    {[
+                      {
+                        key: "heart_rate_bpm",
+                        title: "Heart rate",
+                        unit: "bpm",
+                        icon: Heart,
+                        digits: 0,
+                      },
+                      {
+                        key: "skin_temperature_c",
+                        title: "Skin temperature",
+                        unit: "°C",
+                        icon: Thermometer,
+                        digits: 1,
+                      },
+                      {
+                        key: "movement_rms_ms2",
+                        title: "Movement RMS",
+                        unit: "m/s²",
+                        icon: Activity,
+                        digits: 3,
+                      },
+                      {
+                        key: "ppg_valid_fraction",
+                        title: "PPG valid samples",
+                        unit: "%",
+                        icon: Watch,
+                        digits: 0,
+                      },
+                    ].map((m) => {
+                      const r = data.latest[m.key];
+                      const stale = r && data.as_of_ms - r.ts_ms > 300000;
+                      return (
+                        <div key={m.key} className="border-b border-r p-5 last:border-r-0 xl:border-b-0">
+                          <div className="flex items-center justify-between text-sm text-muted-foreground">
+                            {m.title}
+                            <m.icon size={18} />
+                          </div>
+                          <p className="my-3 text-2xl font-semibold tabular-nums">
+                            {r
+                              ? value(
+                                  r.value *
+                                    (m.key === "ppg_valid_fraction" ? 100 : 1),
+                                  m.digits,
+                                )
+                              : "—"}{" "}
+                            <span className="text-sm font-normal">
+                              {r ? m.unit : "No data"}
+                            </span>
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {r
+                              ? `${stale ? "Older reading · " : ""}${date(r.ts_ms)}`
+                              : "No valid reading in the past 24 hours"}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Skin temperature is a peripheral measurement. SpO₂, ECG,
+                    blood pressure and respiration are not supplied by this app.
+                    Gaps in charts mean no valid samples; no values are filled
+                    in.
+                  </p>
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <Chart
+                      data={data.series}
+                      metric="heart_rate_bpm"
+                      label="Heart rate"
+                      unit="bpm"
+                    />
+                    <Chart
+                      data={data.series}
+                      metric="movement_rms_ms2"
+                      label="Movement"
+                      unit="m/s²"
+                    />
+                    <Chart
+                      data={data.series}
+                      metric="skin_temperature_c"
+                      label="Skin temperature"
+                      unit="°C"
+                    />
+                    <section className={panel}>
+                      <h3 className="mb-4 font-semibold">
+                        Delirium research model
+                      </h3>
+                      {data.prediction.status === "ok" ? (
+                        <>
+                          <p className="text-3xl font-semibold">
+                            {pct(data.prediction.probability)}
+                          </p>
+                          <p className="mt-2 text-sm">
+                            {data.prediction.target === "incident_delirium"
+                              ? `Incident delirium within ${data.prediction.horizon_hours} hours`
+                              : "Current delirium classification"}
+                          </p>
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            Model: {data.prediction.model_version}. Research
+                            estimate; not a diagnosis.
+                          </p>
+                        </>
+                      ) : (
+                        <p className="rounded-md bg-muted p-3 text-sm">
+                          Prediction unavailable: {data.prediction.reason}
+                        </p>
+                      )}
+                      <div className="mt-5 space-y-2 text-sm">
+                        <p>
+                          Recorded events:{" "}
+                          {data.features.quality.event_count.toLocaleString()}
+                        </p>
+                        <p>
+                          Movement coverage:{" "}
+                          {pct(data.features.quality.movement_coverage)}
+                        </p>
+                        <p>
+                          Heart rate minute coverage:{" "}
+                          {pct(
+                            data.features.quality.heart_rate_minute_coverage,
+                          )}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Coverage is recording availability, not a clinical
+                          score. The model receives a versioned feature set;
+                          missing signals stay null.
+                        </p>
+                      </div>
+                    </section>
+                  </div>
+                </>
+              )}
+              <section id="devices" className={panel}>
                 <h3 className="mb-3 flex items-center gap-2 font-semibold">
                   <Link2 size={18} /> Patient–device link
                 </h3>
@@ -776,157 +954,7 @@ export default function Index() {
                   </div>
                 )}
               </section>
-              {!data && (
-                <p className="text-sm text-muted-foreground">
-                  Loading recorded data…
-                </p>
-              )}
-              {data && (
-                <>
-                  {data.truncated && (
-                    <p
-                      role="alert"
-                      className="rounded-md border border-amber-500 p-3 text-sm"
-                    >
-                      The event limit was reached. This view is partial;
-                      prediction is disabled. Export events for complete data.
-                    </p>
-                  )}
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    {[
-                      {
-                        key: "heart_rate_bpm",
-                        title: "Heart rate",
-                        unit: "bpm",
-                        icon: Heart,
-                        digits: 0,
-                      },
-                      {
-                        key: "skin_temperature_c",
-                        title: "Skin temperature",
-                        unit: "°C",
-                        icon: Thermometer,
-                        digits: 1,
-                      },
-                      {
-                        key: "movement_rms_ms2",
-                        title: "Movement RMS",
-                        unit: "m/s²",
-                        icon: Activity,
-                        digits: 3,
-                      },
-                      {
-                        key: "ppg_valid_fraction",
-                        title: "PPG valid samples",
-                        unit: "%",
-                        icon: Watch,
-                        digits: 0,
-                      },
-                    ].map((m) => {
-                      const r = data.latest[m.key];
-                      const stale = r && data.as_of_ms - r.ts_ms > 300000;
-                      return (
-                        <div key={m.key} className={panel}>
-                          <div className="flex items-center justify-between text-sm text-muted-foreground">
-                            {m.title}
-                            <m.icon size={18} />
-                          </div>
-                          <p className="my-3 text-3xl font-semibold">
-                            {r
-                              ? value(
-                                  r.value *
-                                    (m.key === "ppg_valid_fraction" ? 100 : 1),
-                                  m.digits,
-                                )
-                              : "—"}{" "}
-                            <span className="text-sm font-normal">
-                              {r ? m.unit : "No data"}
-                            </span>
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {r
-                              ? `${stale ? "Older reading · " : ""}${date(r.ts_ms)}`
-                              : "No valid reading in the past 24 hours"}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Skin temperature is a peripheral measurement. SpO₂, ECG,
-                    blood pressure and respiration are not supplied by this app.
-                    Gaps in charts mean no valid samples; no values are filled
-                    in.
-                  </p>
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    <Chart
-                      data={data.series}
-                      metric="heart_rate_bpm"
-                      label="Heart rate"
-                      unit="bpm"
-                    />
-                    <Chart
-                      data={data.series}
-                      metric="movement_rms_ms2"
-                      label="Movement"
-                      unit="m/s²"
-                    />
-                    <Chart
-                      data={data.series}
-                      metric="skin_temperature_c"
-                      label="Skin temperature"
-                      unit="°C"
-                    />
-                    <section className={panel}>
-                      <h3 className="mb-4 font-semibold">
-                        Delirium research model
-                      </h3>
-                      {data.prediction.status === "ok" ? (
-                        <>
-                          <p className="text-3xl font-semibold">
-                            {pct(data.prediction.probability)}
-                          </p>
-                          <p className="mt-2 text-sm">
-                            {data.prediction.target === "incident_delirium"
-                              ? `Incident delirium within ${data.prediction.horizon_hours} hours`
-                              : "Current delirium classification"}
-                          </p>
-                          <p className="mt-2 text-xs text-muted-foreground">
-                            Model: {data.prediction.model_version}. Research
-                            estimate; not a diagnosis.
-                          </p>
-                        </>
-                      ) : (
-                        <p className="rounded-md bg-muted p-3 text-sm">
-                          Prediction unavailable: {data.prediction.reason}
-                        </p>
-                      )}
-                      <div className="mt-5 space-y-2 text-sm">
-                        <p>
-                          Recorded events:{" "}
-                          {data.features.quality.event_count.toLocaleString()}
-                        </p>
-                        <p>
-                          Movement coverage:{" "}
-                          {pct(data.features.quality.movement_coverage)}
-                        </p>
-                        <p>
-                          Heart rate minute coverage:{" "}
-                          {pct(
-                            data.features.quality.heart_rate_minute_coverage,
-                          )}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Coverage is recording availability, not a clinical
-                          score. The model receives a versioned feature set;
-                          missing signals stay null.
-                        </p>
-                      </div>
-                    </section>
-                  </div>
-                </>
-              )}
-              <section className={panel}>
+              <section id="cognition" className={panel}>
                 <h3 className="mb-2 flex items-center gap-2 font-semibold">
                   <Brain size={18} /> Cognition tests
                 </h3>
@@ -1092,7 +1120,7 @@ export default function Index() {
                   </div>
                 </details>
               </section>
-              <section className={panel}>
+              <section id="assessments" className={panel}>
                 <h3 className="mb-2 font-semibold">
                   Clinical assessments and research labels
                 </h3>
@@ -1199,6 +1227,7 @@ export default function Index() {
                 </div>
               </section>
               <section
+                id="export"
                 className={
                   panel + " flex flex-wrap items-center justify-between gap-3"
                 }
@@ -1216,30 +1245,6 @@ export default function Index() {
               </section>
             </>
           )}
-          {!activePatient && !newPatient && (
-            <section className={panel}>
-              <h2 className="mb-2 text-xl font-semibold">
-                Start with a patient
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Add a patient, register or discover their watch, and link its
-                study ID. New patients start with no measurements.
-              </p>
-              <button
-                className={button + " mt-4"}
-                onClick={() => {
-                  setNewPatient(true);
-                  setEditing(false);
-                  setName("");
-                  setAge("");
-                  setRoom("");
-                  setGender("");
-                }}
-              >
-                Add patient
-              </button>
-            </section>
-          )}
           <footer className="py-4 text-xs text-muted-foreground">
             Recorded research data only · Auto-refresh every 15 seconds · No
             clinical thresholds are inferred from watch measurements.
@@ -1249,3 +1254,4 @@ export default function Index() {
     </div>
   );
 }
+

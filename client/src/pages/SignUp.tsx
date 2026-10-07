@@ -59,7 +59,7 @@ const SignUp = () => {
         <ThemeToggle />
       </div>
 
-      <Card className="w-full max-w-md border-border shadow-lg">
+      <Card className="w-full max-w-md border-border shadow-none">
         <CardHeader className="space-y-1 text-center">
           <BrandLogo className="mx-auto mb-4 w-52 max-w-full" />
           <CardTitle className="text-2xl font-bold tracking-tight">
