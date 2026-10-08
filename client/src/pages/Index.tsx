@@ -12,15 +12,7 @@ import {
   Thermometer,
   Watch,
 } from "lucide-react";
-import {
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "recharts";
+import Chart from "@/components/RecordedChart";
 import { axiosInstance as api } from "@/lib/axios";
 import { useAuthStore } from "@/store/useAuthStore";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -124,70 +116,6 @@ function localTime() {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
     .toISOString()
     .slice(0, 16);
-}
-function Chart({
-  data,
-  metric,
-  label,
-  unit,
-}: {
-  data: Overview["series"];
-  metric: string;
-  label: string;
-  unit: string;
-}) {
-  const populated = data.some(
-    (row) => row[metric] !== null && row[metric] !== undefined,
-  );
-  return (
-    <section className={panel}>
-      <h3 className="mb-4 font-semibold">
-        {label}{" "}
-        <span className="text-xs font-normal text-muted-foreground">
-          5 minute means · {unit}
-        </span>
-      </h3>
-      {populated ? (
-        <div className="h-52">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ left: 0, right: 12 }}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-              <XAxis
-                dataKey="ts_ms"
-                type="number"
-                domain={["dataMin", "dataMax"]}
-                tickFormatter={(n) =>
-                  new Date(n).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                }
-                minTickGap={45}
-              />
-              <YAxis domain={["auto", "auto"]} width={48} />
-              <Tooltip
-                labelFormatter={(n) => date(Number(n))}
-                formatter={(n) => [value(Number(n), 2), unit]}
-              />
-              <Line
-                type="linear"
-                dataKey={metric}
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                dot={false}
-                connectNulls={false}
-                isAnimationActive={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      ) : (
-        <div className="flex h-52 items-center justify-center text-sm text-muted-foreground">
-          No recorded {label.toLowerCase()} in the past 24 hours
-        </div>
-      )}
-    </section>
-  );
 }
 export default function Index() {
   const { authUser, logout } = useAuthStore();
@@ -703,18 +631,21 @@ export default function Index() {
                   <div className="grid gap-4 xl:grid-cols-2">
                     <Chart
                       data={data.series}
+                      asOf={data.as_of_ms}
                       metric="heart_rate_bpm"
                       label="Heart rate"
                       unit="bpm"
                     />
                     <Chart
                       data={data.series}
+                      asOf={data.as_of_ms}
                       metric="movement_rms_ms2"
                       label="Movement"
                       unit="m/s²"
                     />
                     <Chart
                       data={data.series}
+                      asOf={data.as_of_ms}
                       metric="skin_temperature_c"
                       label="Skin temperature"
                       unit="°C"
