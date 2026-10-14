@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
+import ScenarioReplay from "./pages/ScenarioReplay";
 import { Loader } from "lucide-react";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
@@ -33,6 +34,7 @@ const App = () => {
           <Sonner />
           <BrowserRouter>
             <Routes>
+              <Route path="/scenario-replay" element={authUser ? <ScenarioReplay /> : <Navigate to="/login" replace />} />
               <Route
                 path="/"
                 element={
@@ -59,3 +61,4 @@ const App = () => {
 };
 
 export default App;
+
