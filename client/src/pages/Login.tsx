@@ -1,6 +1,7 @@
+import { privateDemo } from '@/lib/privateDemo';
 import BrandLogo from "@/components/BrandLogo";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -18,15 +19,12 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { useAuthStore } from "../store/useAuthStore";
 
 const Login = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
   const { login, isLoggingIn } = useAuthStore();
-  const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +44,7 @@ const Login = () => {
             Sign in
           </CardTitle>
           <CardDescription className="text-muted-foreground">
-            Enter your credentials to access your dashboard
+            {privateDemo ? "Invited team members only. Use the account provided by your project operator." : "Enter your credentials to access your dashboard"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -57,6 +55,7 @@ const Login = () => {
                 <Input
                   id="email"
                   type="email"
+                  autoComplete="username"
                   placeholder="name@example.com"
                   value={formData.email}
                   onChange={(e) =>
@@ -76,6 +75,7 @@ const Login = () => {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
                   placeholder="••••••••"
                   value={formData.password}
                   onChange={(e) =>
@@ -97,12 +97,12 @@ const Login = () => {
                 </button>
               </div>
             </div>
-            <Button type="submit" className="w-full">
-              Sign in
+            <Button type="submit" className="w-full" disabled={isLoggingIn}>
+              {isLoggingIn ? "Signing in…" : "Sign in"}
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex justify-center">
+        {!privateDemo && <CardFooter className="flex justify-center">
           <p className="text-center text-sm text-muted-foreground">
             Don't have an account?{" "}
             <Link
@@ -112,10 +112,11 @@ const Login = () => {
               Create account
             </Link>
           </p>
-        </CardFooter>
+        </CardFooter>}
       </Card>
     </div>
   );
 };
 
 export default Login;
+

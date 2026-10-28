@@ -1,3 +1,7 @@
+import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { assertPrivateConfig, privateMode, securityHeaders, demoBoundary } from './middleware/privateDemo.js';
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
@@ -18,12 +22,16 @@ import errorHandler from './utils/errorHandler.js';
 
 
 dotenv.config();
+assertPrivateConfig();
 
 const app = express();
-app.set('trust proxy', 1);
+app.disable('x-powered-by');
+app.set('trust proxy', privateMode() ? 1 : false);
+app.use(securityHeaders);
+app.use(demoBoundary);
 
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:8080',
+  origin: privateMode() ? process.env.PUBLIC_ORIGIN : (process.env.CORS_ORIGIN || 'http://localhost:8080'),
   credentials: true, 
 }));
 
@@ -53,7 +61,14 @@ app.use('/api/v1/appointments', protectedRoute, appointmentRoutes);
 app.use('/api/v1', ingestRouter);
 app.use('/api/v1/research', researchRouter);
 
-app.get('/', (req, res) => res.send('API Running'));
+app.get('/healthz', (req, res) => res.json({ status: 'ok' }));
+const staticRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..', 'client/dist');
+if (privateMode() && existsSync(resolve(staticRoot, 'index.html'))) {
+  app.use(express.static(staticRoot, { maxAge: 0 }));
+  app.get('/{*path}', (req, res, next) => req.path.startsWith('/api/') ? next() : res.sendFile(resolve(staticRoot, 'index.html')));
+} else {
+  app.get('/', (req, res) => res.send('API Running'));
+}
 
 app.use(notFound)
 
@@ -62,3 +77,4 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+

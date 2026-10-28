@@ -1,0 +1,4 @@
+{$DEMO_HOSTNAME} {
+	encode zstd gzip
+	reverse_proxy api:5000
+}

@@ -128,6 +128,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Logout failed.");
       console.error("Error logging out:", error);
+    } finally {
+      set({ authUser: null });
     }
   },
 
@@ -159,3 +161,4 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 }));
+

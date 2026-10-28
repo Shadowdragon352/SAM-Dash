@@ -1,3 +1,4 @@
+import { privateMode, teamAllowed } from '../middleware/privateDemo.js';
 import { secretMatches, hashToken } from '../delirium/contract.js';
 import bcrypt from "bcryptjs";
 import User from "../models/User.js";
@@ -5,6 +6,7 @@ import AppError from "../utils/AppError.js";
 import  generateToken  from "../utils/generateToken.js";
 export const signup = async (req, res, next) => {
   try {
+    if (privateMode()) return next(new AppError("Accounts are created by the team operator; public registration is disabled", 403));
     const { fullName, password, department, specialty } = req.body;
     const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     if (!process.env.REGISTRATION_CODE || !secretMatches(String(req.body.registrationCode || ''), hashToken(process.env.REGISTRATION_CODE))) {
@@ -70,6 +72,7 @@ export const login = async (req, res, next) => {
   try {
     const { password } = req.body;
     const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!teamAllowed(email)) return next(new AppError("Wrong email or password", 400));
     // check email and password are provided
     if (!email || typeof password !== 'string' || !password || password.length > 256) {
       return next(new AppError("Please provide all fields", 400));
@@ -86,7 +89,7 @@ export const login = async (req, res, next) => {
       return next(new AppError("Wrong email or password", 400));
     }
     // generate token
-    const token = generateToken(userExists._id, "1h");
+    const token = generateToken(userExists._id, "1h", userExists.sessionVersion);
     // exclude password from user object
     const { password: excludedPassword, ...userInfo } = userExists._doc;
     // send token in cookie
@@ -181,3 +184,4 @@ export const checkAuth = async (req, res, next) => {
     next(new AppError(error.message || "internal server error!", 500));
   }
 };
+

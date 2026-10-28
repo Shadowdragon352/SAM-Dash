@@ -1,11 +1,15 @@
+import { privateDemo } from '@/lib/privateDemo';
+import { builtInReplay } from '@/data/demoReplay';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { parseReplay, replayMessages, type ReplayRow } from '@/lib/scenarioReplay';
 
 export default function ScenarioReplay() {
-  const [rows, setRows] = useState<ReplayRow[]>([]);
-  const [scenario, setScenario] = useState('');
+  const [rows, setRows] = useState<ReplayRow[]>(() => privateDemo ? builtInReplay() : []);
+  const [scenario, setScenario] = useState(privateDemo ? 'stable_baseline' : '');
+  const logout = useAuthStore(state => state.logout);
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState('');
@@ -35,17 +39,17 @@ export default function ScenarioReplay() {
     }
   }
   return <main className="mx-auto max-w-6xl space-y-6 p-6">
-    <Link to="/" className="underline">← Patient dashboard</Link>
+    {privateDemo ? <button className="underline" onClick={() => void logout()}>Sign out</button> : <Link to="/" className="underline">← Patient dashboard</Link>}
     <header><h1 className="text-2xl font-bold">SAM scenario replay</h1>
-      <p className="text-muted-foreground">University prototype · local demonstration</p></header>
+      <p className="text-muted-foreground">University prototype · scenario demonstration</p></header>
     <section className="rounded-md border border-amber-500 bg-card p-4">
       <strong>Simulated observations · no clinical prediction</strong>
-      <p>Colab exports combine recorded ICU vital signs with scripted baseline changes. These are not actual patient histories or smartwatch recordings. No SAD model is used.</p>
+      <p>{privateDemo ? "All displayed readings, baseline descriptions and observations are invented software fixtures. They are not patient histories or smartwatch recordings. No SAD model is used." : "Colab exports combine recorded ICU vital signs with scripted baseline changes. These are not actual patient histories or smartwatch recordings. No SAD model is used."}</p>
       <p className="mt-2 text-sm">Files stay in this browser component and are cleared on navigation or reload. Nothing is uploaded to patient records.</p>
     </section>
-    <label className="block">Import <code>sam_replay.json</code> from your Colab ZIP
+    {!privateDemo && <label className="block">Import <code>sam_replay.json</code> from your Colab ZIP
       <input className="mt-2 block" type="file" accept=".json,application/json"
-        onChange={e => { void importFile(e.target.files?.[0]); e.target.value = ''; }} /></label>
+        onChange={e => { void importFile(e.target.files?.[0]); e.target.value = ''; }} /></label>}
     {error && <p role="alert" className="text-red-600">{error}</p>}
     {!current && !error && <p>Import the JSON file to choose a scenario and replay its hourly readings.</p>}
     {current && <>
@@ -62,10 +66,10 @@ export default function ScenarioReplay() {
       <section className="rounded-md border bg-card p-4">
         <h2 className="font-semibold">{current.demo_patient_id}</h2>
         <p>{current.scenario_description}</p>
-        <p className="text-sm text-muted-foreground">Source record {current.source_record_id} · ICU hour {current.hour} · age {current.age_years}</p>
+        <p className="text-sm text-muted-foreground">{current.source_record_id === "SYNTHETIC-NO-SOURCE" ? "Fully synthetic fixture" : `Source record ${current.source_record_id}`} · Demonstration hour {current.hour} · age {current.age_years}</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <p>Recorded heart rate: <b>{current.heart_rate_bpm ?? 'Missing'}</b>{current.heart_rate_bpm !== null && ' bpm'}</p>
-          <p>Recorded SpO₂: <b>{current.spo2_percent ?? 'Missing'}</b>{current.spo2_percent !== null && '%'}</p>
+          <p>Heart rate: <b>{current.heart_rate_bpm ?? 'Missing'}</b>{current.heart_rate_bpm !== null && ' bpm'}</p>
+          <p>SpO₂: <b>{current.spo2_percent ?? 'Missing'}</b>{current.spo2_percent !== null && '%'}</p>
         </div>
         <p className="mt-3">Synthetic usual baseline: {current.baseline_available ? current.synthetic_baseline ?? 'Description unavailable' : 'Unavailable'}</p>
         {current.synthetic_sensor_dropout && <p>Synthetic sensor dropout is active.</p>}
@@ -76,7 +80,7 @@ export default function ScenarioReplay() {
       </section>
       <div className="grid gap-6 md:grid-cols-2">
         {(['heart_rate_bpm', 'spo2_percent'] as const).map(metric => <section key={metric} className="min-w-0 rounded-md border bg-card p-4">
-          <h2 className="mb-3 font-semibold">{metric === 'heart_rate_bpm' ? 'Heart rate (bpm)' : 'SpO₂ (%)'} · hourly source readings</h2>
+          <h2 className="mb-3 font-semibold">{metric === 'heart_rate_bpm' ? 'Heart rate (bpm)' : 'SpO₂ (%)'} · hourly demonstration readings</h2>
           <ResponsiveContainer width="100%" height={240}>
             <LineChart data={sequence.slice(0, step + 1)}>
               <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="hour" />
@@ -90,3 +94,4 @@ export default function ScenarioReplay() {
     </>}
   </main>;
 }
+

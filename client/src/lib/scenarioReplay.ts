@@ -27,7 +27,7 @@ export function parseReplay(text: string): ReplayRow[] {
       || (r.synthetic_baseline !== null && typeof r.synthetic_baseline !== 'string')
       || r.clinical_prediction !== false
       || r.observation_provenance !== 'SCRIPTED SYNTHETIC'
-      || !['PHYSIONET ICU RECORDING', 'SYNTHETIC DROPOUT'].includes(String(r.vital_provenance)))
+      || !['PHYSIONET ICU RECORDING', 'SYNTHETIC DROPOUT', 'FULLY SYNTHETIC'].includes(String(r.vital_provenance)))
       throw new Error(`Row ${i + 1} is not a supported synthetic Colab replay row.`);
     const key = JSON.stringify([r.scenario_id, r.hour]);
     if (seen.has(key)) throw new Error(`Duplicate hour in scenario ${r.scenario_id}.`);
@@ -48,3 +48,4 @@ export function replayMessages(row: ReplayRow): string[] {
   if (!messages.length) messages.push('No scripted prompt at this step. This does not establish clinical stability.');
   return messages;
 }
+

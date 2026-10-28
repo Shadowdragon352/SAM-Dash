@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema(
   {
+    sessionVersion: { type: String, default: () => new mongoose.Types.ObjectId().toHexString() },
     email: {
       type: String,
       required: true,
@@ -65,3 +66,4 @@ const userSchema = new mongoose.Schema(
 const User = mongoose.model('User', userSchema);
 
 export default User;
+
