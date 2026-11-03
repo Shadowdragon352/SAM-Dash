@@ -1,3 +1,4 @@
+import LiveVolunteer from "./pages/LiveVolunteer";
 import { privateDemo } from './lib/privateDemo';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -36,6 +37,7 @@ const App = () => {
           <BrowserRouter>
             {privateDemo && <aside className="border-b bg-amber-100 p-3 text-center text-sm text-slate-900">Private team demo · Fully synthetic scenarios · Not for clinical use</aside>}
             <Routes>
+              <Route path="/live-volunteer" element={authUser ? <LiveVolunteer /> : <Navigate to="/login" replace />} />
               <Route path="/scenario-replay" element={authUser ? <ScenarioReplay /> : <Navigate to="/login" replace />} />
               <Route
                 path="/"

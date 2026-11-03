@@ -170,6 +170,26 @@ ingestRouter.get(
   }),
 );
 researchRouter.use(protectedRoute);
+researchRouter.get("/live-volunteer", handle(async (req, res) => {
+  const deviceId = liveDemoDevice();
+  if (!deviceId) fail("Live volunteer is disabled", 404);
+  const device = await Device.findOne({ deviceId }).lean();
+  const assignment = device?.assignments.find((item) => item.to == null);
+  const event = assignment && await WatchEvent.findOne({
+    device_id: deviceId,
+    study_id: assignment.studyId,
+    patientId: assignment.patientId,
+    assignmentId: assignment._id,
+    type: "movement_5s",
+    ts_ms: { $gte: assignment.from },
+  }).sort({ ts_ms: -1 }).select("ts_ms receivedAt payload.rms").lean();
+  res.json({ reading: event ? {
+    movementRms: event.payload.rms ?? null,
+    capturedAt: event.ts_ms,
+    receivedAt: event.receivedAt,
+  } : null });
+}));
+
 researchRouter.get(
   "/devices",
   handle(async (req, res) => {
