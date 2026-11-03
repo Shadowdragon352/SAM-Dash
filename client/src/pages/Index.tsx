@@ -1,4 +1,5 @@
 import BrandLogo from "@/components/BrandLogo";
+import { Link } from "react-router-dom";
 import PatientDirectory, { type PatientSummary } from "@/components/PatientDirectory";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -363,6 +364,7 @@ export default function Index() {
           </div>
         </button>
         <div className="flex items-center gap-3 text-sm">
+          <Link className={secondary} to="/scenario-replay">Scenario replay</Link>
           <span className="hidden text-muted-foreground sm:inline">{authUser?.fullName}</span>
           <ThemeToggle />
           <button className={secondary} onClick={() => void logout()}>
@@ -1185,4 +1187,5 @@ export default function Index() {
     </div>
   );
 }
+
 
