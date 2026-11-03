@@ -87,17 +87,13 @@ export default function ScenarioReplay() {
           <p>Heart rate: <b>{current.heart_rate_bpm ?? 'Missing'}</b>{current.heart_rate_bpm !== null && ' bpm'}</p>
           <p>SpO₂: <b>{current.spo2_percent ?? 'Missing'}</b>{current.spo2_percent !== null && '%'}</p>
         </div>
-    <section className="space-y-2 rounded border p-4">
-      <h2 className="font-semibold">Experimental scenario scores</h2>
-      <p>Precomputed model outputs for a matched held-out wrist window with synthetic cognition. The change case uses scripted perturbations.</p>
-      <p>Validation threshold {modelDemo.threshold.toFixed(4)}</p>
-      <ul>
-        {modelDemo.cases.map(({ label, score, flag }) => (
-          <li key={label}>{label === "unmodified" ? "Unmodified reference" : "Scripted mixed change"} · Score {score.toFixed(4)} · {flag ? "Flagged" : "No flag"}</li>
-        ))}
-      </ul>
-      <p>Research scenario recognition only. No clinical risk estimate.</p>
-    </section>
+        {privateDemo && scenario === 'baseline_change' && current.hour >= 10 && (
+          <div className="mt-4 rounded-md border border-amber-500 p-4">
+            <h3 className="font-semibold">Simulated SAD risk · Next 6 hours</h3>
+            <p className="text-2xl font-bold">25%</p>
+            <p>Scripted example for this fictional patient. No model is used to calculate this estimate.</p>
+          </div>
+        )}
 
         <p className="mt-3">Synthetic usual baseline: {current.baseline_available ? current.synthetic_baseline ?? 'Description unavailable' : 'Unavailable'}</p>
         {current.synthetic_sensor_dropout && <p>Synthetic sensor dropout is active.</p>}
@@ -120,6 +116,17 @@ export default function ScenarioReplay() {
         </section>)}
       </div>
     </>}
+    <section className="space-y-2 rounded border p-4">
+      <h2 className="font-semibold">Held-out model test</h2>
+      <p>Precomputed model outputs for a matched held-out wrist window with synthetic cognition. The change case uses scripted perturbations.</p>
+      <p>Validation threshold {modelDemo.threshold.toFixed(4)}</p>
+      <ul>
+        {modelDemo.cases.map(({ label, score, flag }) => (
+          <li key={label}>{label === "unmodified" ? "Unmodified reference" : "Scripted mixed change"} · Score {score.toFixed(4)} · {flag ? "Flagged" : "No flag"}</li>
+        ))}
+      </ul>
+      <p>Research scenario recognition only. No clinical risk estimate.</p>
+    </section>
   </main>;
 }
 
