@@ -4,6 +4,7 @@ type Reading = { movementRms: number | null; capturedAt: number; receivedAt: str
 
 export default function LiveVolunteer() {
   const [reading, setReading] = useState<Reading | null>(null);
+  const [heartRate, setHeartRate] = useState<{ bpm: number | null; capturedAt: number } | null>(null);
   const [status, setStatus] = useState("Checking for a reading…");
   const [now, setNow] = useState(Date.now);
 
@@ -19,10 +20,12 @@ export default function LiveVolunteer() {
         if (!response.ok) throw new Error();
         const data = await response.json();
         setReading(data.reading);
+        setHeartRate(data.heartRate ?? null);
         setStatus(data.reading ? "" : "Waiting for the first movement reading.");
       } catch {
         if (controller.signal.aborted) return;
         setReading(null);
+        setHeartRate(null);
         setStatus("Live readings unavailable. Check your sign-in and try again.");
       }
       if (!controller.signal.aborted) timer = setTimeout(refresh, 5000);
@@ -41,8 +44,15 @@ export default function LiveVolunteer() {
     <main className="mx-auto max-w-3xl space-y-4 p-6">
       <a className="underline" href="/scenario-replay">Scenario Replay</a>
       <h1 className="text-2xl font-bold">Live Volunteer</h1>
-      <p>Watch movement readings · University prototype</p>
+      <p>Watch movement and heart rate · University prototype</p>
       {status && <p role="status">{status}</p>}
+      <section className="space-y-2 rounded border p-4">
+        <p>Heart rate: {heartRate ? (heartRate.bpm === null ? "Unavailable" : `${heartRate.bpm} bpm`) : "No reading yet"}</p>
+        {heartRate && <>
+          <p>Captured: {new Date(heartRate.capturedAt).toLocaleString()}</p>
+          <p>Reading age: {Math.max(0, Math.floor((now - heartRate.capturedAt) / 1000))} seconds{now - heartRate.capturedAt > 60_000 ? " · Stale" : ""}</p>
+        </>}
+      </section>
       {reading && (
         <section className="space-y-2 rounded border p-4">
           <p>Movement RMS: {reading.movementRms === null ? "Unavailable" : `${reading.movementRms.toFixed(3)} m/s²`}</p>

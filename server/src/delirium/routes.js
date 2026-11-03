@@ -7,6 +7,7 @@ import Patient from "../models/Patient.js";
 import { Device, WatchEvent, Assessment } from "./models.js";
 import {
   validateBatch,
+  reading,
   assignmentFor,
   hashToken,
   secretMatches,
@@ -175,18 +176,22 @@ researchRouter.get("/live-volunteer", handle(async (req, res) => {
   if (!deviceId) fail("Live volunteer is disabled", 404);
   const device = await Device.findOne({ deviceId }).lean();
   const assignment = device?.assignments.find((item) => item.to == null);
-  const event = assignment && await WatchEvent.findOne({
+  const latest = async (type) => assignment && await WatchEvent.findOne({
     device_id: deviceId,
     study_id: assignment.studyId,
     patientId: assignment.patientId,
     assignmentId: assignment._id,
-    type: "movement_5s",
+    type,
     ts_ms: { $gte: assignment.from },
-  }).sort({ ts_ms: -1 }).select("ts_ms receivedAt payload.rms").lean();
+  }).sort({ ts_ms: -1 }).select("type source ts_ms receivedAt payload.rms payload.bpm payload.status").lean();
+  const [event, heart] = await Promise.all([latest("movement_5s"), latest("heart_rate")]);
   res.json({ reading: event ? {
     movementRms: event.payload.rms ?? null,
     capturedAt: event.ts_ms,
     receivedAt: event.receivedAt,
+  } : null, heartRate: heart ? {
+    bpm: reading(heart)?.value ?? null,
+    capturedAt: heart.ts_ms,
   } : null });
 }));
 
