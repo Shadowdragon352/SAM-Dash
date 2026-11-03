@@ -6,6 +6,22 @@ import { Link } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { parseReplay, replayMessages, type ReplayRow } from '@/lib/scenarioReplay';
 
+const modelDemo = {
+  "threshold": 0.5623265537576067,
+  "cases": [
+    {
+      "label": "unmodified",
+      "score": 0.003294478534273984,
+      "flag": false
+    },
+    {
+      "label": "scripted_mixed_change",
+      "score": 0.9931045592891142,
+      "flag": true
+    }
+  ]
+};
+
 export default function ScenarioReplay() {
   const [rows, setRows] = useState<ReplayRow[]>(() => privateDemo ? builtInReplay() : []);
   const [scenario, setScenario] = useState(privateDemo ? 'stable_baseline' : '');
@@ -44,7 +60,7 @@ export default function ScenarioReplay() {
       <p className="text-muted-foreground">University prototype · scenario demonstration</p></header>
     <section className="rounded-md border border-amber-500 bg-card p-4">
       <strong>Simulated observations · no clinical prediction</strong>
-      <p>{privateDemo ? "All displayed readings, baseline descriptions and observations are invented software fixtures. They are not patient histories or smartwatch recordings. No SAD model is used." : "Colab exports combine recorded ICU vital signs with scripted baseline changes. These are not actual patient histories or smartwatch recordings. No SAD model is used."}</p>
+      <p>{privateDemo ? "All displayed readings, baseline descriptions and observations are invented software fixtures. They are not patient histories or smartwatch recordings. Replay controls display scripted observations. The model examples below are precomputed." : "Colab exports combine recorded ICU vital signs with scripted baseline changes. These are not actual patient histories or smartwatch recordings. Replay controls display scripted observations. The model examples below are precomputed."}</p>
       <p className="mt-2 text-sm">Files stay in this browser component and are cleared on navigation or reload. Nothing is uploaded to patient records.</p>
     </section>
     {!privateDemo && <label className="block">Import <code>sam_replay.json</code> from your Colab ZIP
@@ -71,6 +87,18 @@ export default function ScenarioReplay() {
           <p>Heart rate: <b>{current.heart_rate_bpm ?? 'Missing'}</b>{current.heart_rate_bpm !== null && ' bpm'}</p>
           <p>SpO₂: <b>{current.spo2_percent ?? 'Missing'}</b>{current.spo2_percent !== null && '%'}</p>
         </div>
+    <section className="space-y-2 rounded border p-4">
+      <h2 className="font-semibold">Experimental scenario scores</h2>
+      <p>Precomputed model outputs for a matched held-out wrist window with synthetic cognition. The change case uses scripted perturbations.</p>
+      <p>Validation threshold {modelDemo.threshold.toFixed(4)}</p>
+      <ul>
+        {modelDemo.cases.map(({ label, score, flag }) => (
+          <li key={label}>{label === "unmodified" ? "Unmodified reference" : "Scripted mixed change"} · Score {score.toFixed(4)} · {flag ? "Flagged" : "No flag"}</li>
+        ))}
+      </ul>
+      <p>Research scenario recognition only. No clinical risk estimate.</p>
+    </section>
+
         <p className="mt-3">Synthetic usual baseline: {current.baseline_available ? current.synthetic_baseline ?? 'Description unavailable' : 'Unavailable'}</p>
         {current.synthetic_sensor_dropout && <p>Synthetic sensor dropout is active.</p>}
       </section>
