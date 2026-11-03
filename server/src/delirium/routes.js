@@ -1,6 +1,7 @@
 import express from "express";
 import mongoose from "mongoose";
 import { randomBytes } from "node:crypto";
+import { liveDemoDevice } from "../middleware/privateDemo.js";
 import protectedRoute from "../middleware/auth.middleware.js";
 import Patient from "../models/Patient.js";
 import { Device, WatchEvent, Assessment } from "./models.js";
@@ -42,10 +43,10 @@ function globalKey(token) {
     .filter(Boolean)
     .some((key) => secretMatches(token, hashToken(key.trim())));
 }
-async function deviceAuth(req, ids) {
+async function deviceAuth(req, ids, scopedOnly = false) {
   const token = bearer(req);
   if (!token) fail("A device Bearer token is required", 401);
-  if (globalKey(token)) return;
+  if (!scopedOnly && globalKey(token)) return;
   if (ids.length !== 1)
     fail("Device token can access only its own device", 403);
   const device = await Device.findOne({ deviceId: ids[0] }).select(
@@ -74,8 +75,19 @@ ingestRouter.post(
   handle(async (req, res) => {
     const events = validateBatch(req.body),
       ids = [...new Set(events.map((e) => e.device_id))];
-    await deviceAuth(req, ids);
+    const liveDevice = liveDemoDevice();
+    if (liveDevice && (ids.length !== 1 || ids[0] !== liveDevice))
+      fail("Device is not enabled for live demo uploads", 403);
     const result = await mutate(async () => {
+      await deviceAuth(req, ids, Boolean(liveDevice));
+      if (liveDevice) {
+        const device = await Device.findOne({ deviceId: liveDevice });
+        if (!device) fail("Live demo device is not registered", 403);
+        if (events.some((event) => {
+          const assignment = assignmentFor(device, event);
+          return !assignment || assignment.to != null;
+        })) fail("Events must match the active volunteer assignment", 403);
+      }
       const existing = await WatchEvent.find({
         event_id: { $in: events.map((e) => e.event_id) },
       })
@@ -447,4 +459,5 @@ researchRouter.get(
     }
   }),
 );
+
 

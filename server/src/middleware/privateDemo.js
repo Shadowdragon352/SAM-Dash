@@ -1,6 +1,7 @@
 import AppError from '../utils/AppError.js';
 
 export const privateMode = (env = process.env) => env.PRIVATE_DEMO === 'true';
+export const liveDemoDevice = (env = process.env) => privateMode(env) ? env.DEMO_LIVE_DEVICE_ID?.trim() : undefined;
 export const teamEmails = (env = process.env) => new Set((env.TEAM_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean));
 export const teamAllowed = (email, env = process.env) => !privateMode(env) || teamEmails(env).has(String(email || '').trim().toLowerCase());
 
@@ -19,8 +20,9 @@ export function demoBoundary(req, res, next) {
   if (!privateMode()) return next();
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
-  // The sandbox supports local replay, not live device ingest or record changes.
+  // The opted-in upload route uses a scoped Bearer credential, independent of browser sessions.
   const path = req.path.toLowerCase().replace(/\/+$/, '');
+  if (path === '/api/v1/ingest' && req.method === 'POST' && liveDemoDevice()) return next();
   if (path === '/api/v1/ingest' || path === '/api/v1/device-assignment') return next(new AppError('Live device integration is disabled in this demo', 403));
   const authMutation = ['/api/v1/auth/login', '/api/v1/auth/logout', '/api/v1/auth/signup'].includes(path);
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !authMutation) return next(new AppError('This demonstration is read only; use scenario replay', 403));
