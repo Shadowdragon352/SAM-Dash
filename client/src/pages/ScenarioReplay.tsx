@@ -1,103 +1,184 @@
-import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer } from "recharts";
-import { useEffect, useState } from "react";
+import { privateDemo } from '@/lib/privateDemo';
+import { builtInReplay } from '@/data/demoReplay';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { parseReplay, replayMessages, type ReplayRow } from '@/lib/scenarioReplay';
 
-type Point = { time: number; value: number | null };
-type Reading = { movementRms: number | null; capturedAt: number; receivedAt: string };
-
-export default function LiveVolunteer() {
-  const [reading, setReading] = useState<Reading | null>(null);
-  const [heartRate, setHeartRate] = useState<{ bpm: number | null; capturedAt: number } | null>(null);
-  const [cognition, setCognition] = useState<{ accuracy: number | null; capturedAt: number } | null>(null);
-  const [timeline, setTimeline] = useState<{ movement: Point[]; pulse: Point[] } | null>(null);
-  const [status, setStatus] = useState("Checking for a reading…");
-  const [now, setNow] = useState(Date.now);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout>;
-    async function refresh() {
-      try {
-        const response = await fetch("/api/v1/research/live-volunteer", {
-          signal: controller.signal,
-          cache: "no-store",
-        });
-        if (!response.ok) throw new Error();
-        const data = await response.json();
-        setTimeline(data.timeline ?? null);
-        setReading(data.reading);
-        setHeartRate(data.heartRate ?? null);
-        setCognition(data.cognition ?? null);
-        setStatus(data.reading ? "" : "Waiting for the first movement reading.");
-      } catch {
-        if (controller.signal.aborted) return;
-        setTimeline(null);
-        setReading(null);
-        setHeartRate(null);
-        setCognition(null);
-        setStatus("Live readings unavailable. Check your sign-in and try again.");
-      }
-      if (!controller.signal.aborted) timer = setTimeout(refresh, 5000);
+const modelDemo = {
+  "threshold": 0.5623265537576067,
+  "cases": [
+    {
+      "label": "Reference",
+      "features": {
+        "hr_delta": 0.775,
+        "skin_delta": -4.450000000000003,
+        "movement_log_ratio": 0.4081271243586254,
+        "accuracy_delta": -0.0247501513808825,
+        "rt_log_ratio": -0.135064302885817
+      },
+      "status": "no_scripted_flag",
+      "score": 0.003294478534273984,
+      "clinical_prediction": false
+    },
+    {
+      "label": "Scripted mixed change",
+      "features": {
+        "hr_delta": 2.245546771482012,
+        "skin_delta": -7.53763624936969,
+        "movement_log_ratio": -0.7296992818098542,
+        "accuracy_delta": -0.1743794769893965,
+        "rt_log_ratio": 0.5079546532377871
+      },
+      "status": "scripted_change_flag",
+      "score": 0.9931045592891142,
+      "clinical_prediction": false
+    },
+    {
+      "label": "Activity confounder",
+      "features": {
+        "hr_delta": 6.161019584302241,
+        "skin_delta": -4.450000000000003,
+        "movement_log_ratio": 1.470118662714896,
+        "accuracy_delta": 0.0183607873083863,
+        "rt_log_ratio": -0.0434641243714222
+      },
+      "status": "no_scripted_flag",
+      "score": 0.0027860361546792585,
+      "clinical_prediction": false
+    },
+    {
+      "label": "Watch removed (simulated)",
+      "features": {
+        "hr_delta": 0.775,
+        "skin_delta": -4.450000000000003,
+        "movement_log_ratio": 0.4081271243586254,
+        "accuracy_delta": -0.0247501513808825,
+        "rt_log_ratio": -0.135064302885817
+      },
+      "status": "quality_notice",
+      "reason": "watch_not_worn",
+      "score": null,
+      "clinical_prediction": false
     }
-    void refresh();
-    const clock = setInterval(() => setNow(Date.now()), 1000);
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-      clearInterval(clock);
-    };
-  }, []);
+  ]
+};
 
-  const age = reading ? Math.max(0, Math.floor((now - reading.capturedAt) / 1000)) : null;
-  return (
-    <main className="mx-auto max-w-3xl space-y-4 p-6">
-      <a className="underline" href="/scenario-replay">Scenario Replay</a>
-      <h1 className="text-2xl font-bold">Live Volunteer</h1>
-      <p>Watch movement and heart rate · University prototype</p>
-      {status && <p role="status">{status}</p>}
-      <section className="space-y-2 rounded border p-4">
-        <p>Heart rate: {heartRate ? (heartRate.bpm === null ? "Unavailable" : `${heartRate.bpm} bpm`) : "No reading yet"}</p>
-        {heartRate && <>
-          <p>Captured: {new Date(heartRate.capturedAt).toLocaleString()}</p>
-          <p>Reading age: {Math.max(0, Math.floor((now - heartRate.capturedAt) / 1000))} seconds{now - heartRate.capturedAt > 60_000 ? " · Stale" : ""}</p>
-        </>}
+export default function ScenarioReplay() {
+  const [rows, setRows] = useState<ReplayRow[]>(() => privateDemo ? builtInReplay() : []);
+  const [scenario, setScenario] = useState(privateDemo ? 'stable_baseline' : '');
+  const logout = useAuthStore(state => state.logout);
+  const [modelCase, setModelCase] = useState(0);
+  const example = modelDemo.cases[modelCase];
+  const [step, setStep] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [error, setError] = useState('');
+  const request = useRef(0);
+  const sequence = rows.filter(r => r.scenario_id === scenario);
+  const current = sequence[step];
+  const scenarios = [...new Set(rows.map(r => r.scenario_id))];
+  useEffect(() => {
+    if (!playing) return;
+    if (step >= sequence.length - 1) { setPlaying(false); return; }
+    const timer = window.setTimeout(() => setStep(s => s + 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [playing, step, sequence.length]);
+  useEffect(() => () => { request.current++; }, []);
+
+  async function importFile(file?: File) {
+    if (!file) return;
+    const id = ++request.current;
+    setPlaying(false); setError(''); setRows([]); setScenario(''); setStep(0);
+    try {
+      if (file.size > 5 * 1024 * 1024) throw new Error('Choose a JSON file smaller than 5 MB.');
+      const parsed = parseReplay(await file.text());
+      if (id !== request.current) return;
+      setRows(parsed); setScenario(parsed[0].scenario_id);
+    } catch (e) {
+      if (id === request.current) setError(e instanceof Error ? e.message : 'Could not read file.');
+    }
+  }
+  return <main className="mx-auto max-w-6xl space-y-6 p-6">
+    {privateDemo ? <button className="underline" onClick={() => void logout()}>Sign out</button> : <Link to="/" className="underline">← Patient dashboard</Link>}
+    <header><h1 className="text-2xl font-bold">SAM scenario replay</h1>
+      <p className="text-muted-foreground">University prototype · scenario demonstration</p></header>
+    <section className="rounded-md border border-amber-500 bg-card p-4">
+      <strong>Simulated observations · no clinical prediction</strong>
+      <p>{privateDemo ? "All displayed readings, baseline descriptions and observations are invented software fixtures. They are not patient histories or smartwatch recordings. Replay controls display scripted observations. The model examples below are precomputed." : "Colab exports combine recorded ICU vital signs with scripted baseline changes. These are not actual patient histories or smartwatch recordings. Replay controls display scripted observations. The model examples below are precomputed."}</p>
+      <p className="mt-2 text-sm">Files stay in this browser component and are cleared on navigation or reload. Nothing is uploaded to patient records.</p>
+    </section>
+    {!privateDemo && <label className="block">Import <code>sam_replay.json</code> from your Colab ZIP
+      <input className="mt-2 block" type="file" accept=".json,application/json"
+        onChange={e => { void importFile(e.target.files?.[0]); e.target.value = ''; }} /></label>}
+    {error && <p role="alert" className="text-red-600">{error}</p>}
+    {!current && !error && <p>Import the JSON file to choose a scenario and replay its hourly readings.</p>}
+    {current && <>
+      <section className="flex flex-wrap items-center gap-4 rounded-md border p-4">
+        <label>Scenario <select className="sam-input" value={scenario} onChange={e => {
+          setScenario(e.target.value); setStep(0); setPlaying(false);
+        }}>{scenarios.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}</select></label>
+        <button className="sam-button" disabled={step === sequence.length - 1} onClick={() => setPlaying(p => !p)}>{playing ? 'Pause' : 'Play'}</button>
+        <button className="sam-secondary" onClick={() => { setStep(0); setPlaying(false); }}>Reset</button>
+        <label className="flex-1">Step {step + 1} / {sequence.length}
+          <input aria-label="Replay step" className="block w-full" type="range" min={0} max={sequence.length - 1} value={step}
+            onChange={e => { setStep(Number(e.target.value)); setPlaying(false); }} /></label>
       </section>
-      <section className="space-y-2 rounded border p-4">
-        <h2 className="font-semibold">Latest cognitive check</h2>
-        {cognition ? <>
-          <p>Task accuracy: {cognition.accuracy === null ? "Unavailable" : `${(cognition.accuracy * 100).toFixed(1)}%`}</p>
-          <p>Completed: {new Date(cognition.capturedAt).toLocaleString()}</p>
-        </> : <p>No completed check yet</p>}
+      <section className="rounded-md border bg-card p-4">
+        <h2 className="font-semibold">{current.demo_patient_id}</h2>
+        <p>{current.scenario_description}</p>
+        <p className="text-sm text-muted-foreground">{current.source_record_id === "SYNTHETIC-NO-SOURCE" ? "Fully synthetic fixture" : `Source record ${current.source_record_id}`} · Demonstration hour {current.hour} · age {current.age_years}</p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <p>Heart rate: <b>{current.heart_rate_bpm ?? 'Missing'}</b>{current.heart_rate_bpm !== null && ' bpm'}</p>
+          <p>SpO₂: <b>{current.spo2_percent ?? 'Missing'}</b>{current.spo2_percent !== null && '%'}</p>
+        </div>
+        {privateDemo && scenario === 'baseline_change' && current.hour >= 10 && (
+          <div className="mt-4 rounded-md border border-amber-500 p-4">
+            <h3 className="font-semibold">Simulated SAD risk · Next 6 hours</h3>
+            <p className="text-2xl font-bold">25%</p>
+            <p>Scripted example for this fictional patient. No model is used to calculate this estimate.</p>
+          </div>
+        )}
+
+        <p className="mt-3">Synthetic usual baseline: {current.baseline_available ? current.synthetic_baseline ?? 'Description unavailable' : 'Unavailable'}</p>
+        {current.synthetic_sensor_dropout && <p>Synthetic sensor dropout is active.</p>}
       </section>
-      {timeline && ([
-        ["Movement RMS (m/s²)", timeline.movement],
-        ["Heart rate (bpm)", timeline.pulse],
-      ] as const).map(([label, points]) => {
-        const recent = points.filter(point => point.time >= now - 300_000 && point.time <= now);
-        return <section key={label} className="rounded border p-4">
-          <h2 className="font-semibold">{label} · last five minutes</h2>
-          {recent.some(point => point.value !== null) ? (
-            <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={recent}>
-                <XAxis dataKey="time" type="number" domain={[now - 300_000, now]} allowDataOverflow
-                  tickFormatter={time => new Date(time).toLocaleTimeString()} />
-                <YAxis width={52} />
-                <Tooltip labelFormatter={time => new Date(time).toLocaleTimeString()} />
-                {cognition && cognition.capturedAt >= now - 300_000 && cognition.capturedAt <= now &&
-                  <ReferenceLine x={cognition.capturedAt} stroke="#a16207" label="Cognitive check" />}
-                <Line dataKey="value" name={label} stroke="#2563eb" strokeWidth={0} dot={{ r: 2 }} isAnimationActive={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : <p>No usable readings in this window.</p>}
-        </section>;
-      })}
-      {reading && (
-        <section className="space-y-2 rounded border p-4">
-          <p>Movement RMS: {reading.movementRms === null ? "Unavailable" : `${reading.movementRms.toFixed(3)} m/s²`}</p>
-          <p>Captured: {new Date(reading.capturedAt).toLocaleString()}</p>
-          <p>Received: {new Date(reading.receivedAt).toLocaleString()}</p>
-          <p>Reading age: {age} seconds{age !== null && age > 60 ? " · Stale" : ""}</p>
-        </section>
-      )}
-    </main>
-  );
+      <section aria-live="polite" className="rounded-md border bg-card p-4">
+        <h2 className="font-semibold">Scripted demonstration messages</h2>
+        <ul className="mt-2 list-disc pl-5">{replayMessages(current).map(m => <li key={m}>{m}</li>)}</ul>
+      </section>
+      <div className="grid gap-6 md:grid-cols-2">
+        {(['heart_rate_bpm', 'spo2_percent'] as const).map(metric => <section key={metric} className="min-w-0 rounded-md border bg-card p-4">
+          <h2 className="mb-3 font-semibold">{metric === 'heart_rate_bpm' ? 'Heart rate (bpm)' : 'SpO₂ (%)'} · hourly demonstration readings</h2>
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={sequence.slice(0, step + 1)}>
+              <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="hour" />
+              <YAxis domain={['auto', 'auto']} /><Tooltip />
+              <Line type="linear" dataKey={metric} stroke="#2563eb" connectNulls={false} isAnimationActive={false} />
+            </LineChart>
+          </ResponsiveContainer>
+          <p className="text-xs text-muted-foreground">Missing readings remain gaps. Connecting lines do not represent measurements between hours.</p>
+        </section>)}
+      </div>
+    </>}
+    <section className="space-y-2 rounded border p-4">
+      <h2 className="font-semibold">Held-out model test</h2>
+      <p>Precomputed model outputs for a matched held-out wrist window with synthetic cognition. The change case uses scripted perturbations.</p>
+      <p>Validation threshold {modelDemo.threshold.toFixed(4)}</p>
+      <label>Test case <select className="sam-input" value={modelCase}
+        onChange={event => setModelCase(Number(event.target.value))}>
+        {modelDemo.cases.map(({ label }, index) => <option key={label} value={index}>{label}</option>)}
+      </select></label>
+      <dl className="grid gap-2 sm:grid-cols-2">
+        {Object.entries(example.features).map(([name, value]) => (
+          <div key={name}><dt>{name.replace(/_/g, ' ')}</dt><dd>{value.toFixed(3)}</dd></div>
+        ))}
+      </dl>
+      <p aria-live="polite">{example.score === null
+        ? "Score withheld · the test explicitly marks the watch as removed."
+        : `Score ${example.score.toFixed(4)} · ${example.status === "scripted_change_flag" ? "Flagged" : "No flag"}`}</p>
+      <p>Research scenario recognition only. No clinical risk estimate.</p>
+    </section>
+  </main>;
 }
+
