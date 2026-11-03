@@ -5,6 +5,7 @@ type Reading = { movementRms: number | null; capturedAt: number; receivedAt: str
 export default function LiveVolunteer() {
   const [reading, setReading] = useState<Reading | null>(null);
   const [heartRate, setHeartRate] = useState<{ bpm: number | null; capturedAt: number } | null>(null);
+  const [cognition, setCognition] = useState<{ accuracy: number | null; capturedAt: number } | null>(null);
   const [status, setStatus] = useState("Checking for a reading…");
   const [now, setNow] = useState(Date.now);
 
@@ -21,11 +22,13 @@ export default function LiveVolunteer() {
         const data = await response.json();
         setReading(data.reading);
         setHeartRate(data.heartRate ?? null);
+        setCognition(data.cognition ?? null);
         setStatus(data.reading ? "" : "Waiting for the first movement reading.");
       } catch {
         if (controller.signal.aborted) return;
         setReading(null);
         setHeartRate(null);
+        setCognition(null);
         setStatus("Live readings unavailable. Check your sign-in and try again.");
       }
       if (!controller.signal.aborted) timer = setTimeout(refresh, 5000);
@@ -52,6 +55,13 @@ export default function LiveVolunteer() {
           <p>Captured: {new Date(heartRate.capturedAt).toLocaleString()}</p>
           <p>Reading age: {Math.max(0, Math.floor((now - heartRate.capturedAt) / 1000))} seconds{now - heartRate.capturedAt > 60_000 ? " · Stale" : ""}</p>
         </>}
+      </section>
+      <section className="space-y-2 rounded border p-4">
+        <h2 className="font-semibold">Latest cognitive check</h2>
+        {cognition ? <>
+          <p>Task accuracy: {cognition.accuracy === null ? "Unavailable" : `${(cognition.accuracy * 100).toFixed(1)}%`}</p>
+          <p>Completed: {new Date(cognition.capturedAt).toLocaleString()}</p>
+        </> : <p>No completed check yet</p>}
       </section>
       {reading && (
         <section className="space-y-2 rounded border p-4">

@@ -183,8 +183,8 @@ researchRouter.get("/live-volunteer", handle(async (req, res) => {
     assignmentId: assignment._id,
     type,
     ts_ms: { $gte: assignment.from },
-  }).sort({ ts_ms: -1 }).select("type source ts_ms receivedAt payload.rms payload.bpm payload.status").lean();
-  const [event, heart] = await Promise.all([latest("movement_5s"), latest("heart_rate")]);
+  }).sort({ ts_ms: -1 }).select("type source ts_ms receivedAt payload.rms payload.bpm payload.status payload.accuracy").lean();
+  const [event, heart, cognition] = await Promise.all([latest("movement_5s"), latest("heart_rate"), latest("cognition_summary")]);
   res.json({ reading: event ? {
     movementRms: event.payload.rms ?? null,
     capturedAt: event.ts_ms,
@@ -192,6 +192,9 @@ researchRouter.get("/live-volunteer", handle(async (req, res) => {
   } : null, heartRate: heart ? {
     bpm: reading(heart)?.value ?? null,
     capturedAt: heart.ts_ms,
+  } : null, cognition: cognition ? {
+    accuracy: cognition.payload?.accuracy ?? null,
+    capturedAt: cognition.ts_ms,
   } : null });
 }));
 
