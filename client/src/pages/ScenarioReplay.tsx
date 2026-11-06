@@ -1,11 +1,76 @@
+import { privateDemo } from '@/lib/privateDemo';
+import { builtInReplay } from '@/data/demoReplay';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { parseReplay, replayMessages, type ReplayRow } from '@/lib/scenarioReplay';
 
+const modelDemo = {
+  "threshold": 0.5623265537576067,
+  "cases": [
+    {
+      "label": "Reference",
+      "features": {
+        "hr_delta": 0.775,
+        "skin_delta": -4.450000000000003,
+        "movement_log_ratio": 0.4081271243586254,
+        "accuracy_delta": -0.0247501513808825,
+        "rt_log_ratio": -0.135064302885817
+      },
+      "status": "no_scripted_flag",
+      "score": 0.003294478534273984,
+      "clinical_prediction": false
+    },
+    {
+      "label": "Scripted mixed change",
+      "features": {
+        "hr_delta": 2.245546771482012,
+        "skin_delta": -7.53763624936969,
+        "movement_log_ratio": -0.7296992818098542,
+        "accuracy_delta": -0.1743794769893965,
+        "rt_log_ratio": 0.5079546532377871
+      },
+      "status": "scripted_change_flag",
+      "score": 0.9931045592891142,
+      "clinical_prediction": false
+    },
+    {
+      "label": "Activity confounder",
+      "features": {
+        "hr_delta": 6.161019584302241,
+        "skin_delta": -4.450000000000003,
+        "movement_log_ratio": 1.470118662714896,
+        "accuracy_delta": 0.0183607873083863,
+        "rt_log_ratio": -0.0434641243714222
+      },
+      "status": "no_scripted_flag",
+      "score": 0.0027860361546792585,
+      "clinical_prediction": false
+    },
+    {
+      "label": "Watch removed (simulated)",
+      "features": {
+        "hr_delta": 0.775,
+        "skin_delta": -4.450000000000003,
+        "movement_log_ratio": 0.4081271243586254,
+        "accuracy_delta": -0.0247501513808825,
+        "rt_log_ratio": -0.135064302885817
+      },
+      "status": "quality_notice",
+      "reason": "watch_not_worn",
+      "score": null,
+      "clinical_prediction": false
+    }
+  ]
+};
+
 export default function ScenarioReplay() {
-  const [rows, setRows] = useState<ReplayRow[]>([]);
-  const [scenario, setScenario] = useState('');
+  const [rows, setRows] = useState<ReplayRow[]>(() => privateDemo ? builtInReplay() : []);
+  const [scenario, setScenario] = useState(privateDemo ? 'stable_baseline' : '');
+  const logout = useAuthStore(state => state.logout);
+  const [modelCase, setModelCase] = useState(0);
+  const example = modelDemo.cases[modelCase];
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState('');
@@ -35,17 +100,17 @@ export default function ScenarioReplay() {
     }
   }
   return <main className="mx-auto max-w-6xl space-y-6 p-6">
-    <Link to="/" className="underline">← Patient dashboard</Link>
+    {privateDemo ? <button className="underline" onClick={() => void logout()}>Sign out</button> : <Link to="/" className="underline">← Patient dashboard</Link>}
     <header><h1 className="text-2xl font-bold">SAM scenario replay</h1>
-      <p className="text-muted-foreground">University prototype · local demonstration</p></header>
+      <p className="text-muted-foreground">University prototype · scenario demonstration</p></header>
     <section className="rounded-md border border-amber-500 bg-card p-4">
       <strong>Simulated observations · no clinical prediction</strong>
-      <p>Colab exports combine recorded ICU vital signs with scripted baseline changes. These are not actual patient histories or smartwatch recordings. No SAD model is used.</p>
+      <p>{privateDemo ? "All displayed readings, baseline descriptions and observations are invented software fixtures. They are not patient histories or smartwatch recordings. Replay controls display scripted observations. The model examples below are precomputed." : "Colab exports combine recorded ICU vital signs with scripted baseline changes. These are not actual patient histories or smartwatch recordings. Replay controls display scripted observations. The model examples below are precomputed."}</p>
       <p className="mt-2 text-sm">Files stay in this browser component and are cleared on navigation or reload. Nothing is uploaded to patient records.</p>
     </section>
-    <label className="block">Import <code>sam_replay.json</code> from your Colab ZIP
+    {!privateDemo && <label className="block">Import <code>sam_replay.json</code> from your Colab ZIP
       <input className="mt-2 block" type="file" accept=".json,application/json"
-        onChange={e => { void importFile(e.target.files?.[0]); e.target.value = ''; }} /></label>
+        onChange={e => { void importFile(e.target.files?.[0]); e.target.value = ''; }} /></label>}
     {error && <p role="alert" className="text-red-600">{error}</p>}
     {!current && !error && <p>Import the JSON file to choose a scenario and replay its hourly readings.</p>}
     {current && <>
@@ -62,11 +127,19 @@ export default function ScenarioReplay() {
       <section className="rounded-md border bg-card p-4">
         <h2 className="font-semibold">{current.demo_patient_id}</h2>
         <p>{current.scenario_description}</p>
-        <p className="text-sm text-muted-foreground">Source record {current.source_record_id} · ICU hour {current.hour} · age {current.age_years}</p>
+        <p className="text-sm text-muted-foreground">{current.source_record_id === "SYNTHETIC-NO-SOURCE" ? "Fully synthetic fixture" : `Source record ${current.source_record_id}`} · Demonstration hour {current.hour} · age {current.age_years}</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <p>Recorded heart rate: <b>{current.heart_rate_bpm ?? 'Missing'}</b>{current.heart_rate_bpm !== null && ' bpm'}</p>
-          <p>Recorded SpO₂: <b>{current.spo2_percent ?? 'Missing'}</b>{current.spo2_percent !== null && '%'}</p>
+          <p>Heart rate: <b>{current.heart_rate_bpm ?? 'Missing'}</b>{current.heart_rate_bpm !== null && ' bpm'}</p>
+          <p>SpO₂: <b>{current.spo2_percent ?? 'Missing'}</b>{current.spo2_percent !== null && '%'}</p>
         </div>
+        {privateDemo && scenario === 'baseline_change' && current.hour >= 10 && (
+          <div className="mt-4 rounded-md border border-amber-500 p-4">
+            <h3 className="font-semibold">Simulated SAD risk · Next 6 hours</h3>
+            <p className="text-2xl font-bold">25%</p>
+            <p>Scripted example for this fictional patient. No model is used to calculate this estimate.</p>
+          </div>
+        )}
+
         <p className="mt-3">Synthetic usual baseline: {current.baseline_available ? current.synthetic_baseline ?? 'Description unavailable' : 'Unavailable'}</p>
         {current.synthetic_sensor_dropout && <p>Synthetic sensor dropout is active.</p>}
       </section>
@@ -76,7 +149,7 @@ export default function ScenarioReplay() {
       </section>
       <div className="grid gap-6 md:grid-cols-2">
         {(['heart_rate_bpm', 'spo2_percent'] as const).map(metric => <section key={metric} className="min-w-0 rounded-md border bg-card p-4">
-          <h2 className="mb-3 font-semibold">{metric === 'heart_rate_bpm' ? 'Heart rate (bpm)' : 'SpO₂ (%)'} · hourly source readings</h2>
+          <h2 className="mb-3 font-semibold">{metric === 'heart_rate_bpm' ? 'Heart rate (bpm)' : 'SpO₂ (%)'} · hourly demonstration readings</h2>
           <ResponsiveContainer width="100%" height={240}>
             <LineChart data={sequence.slice(0, step + 1)}>
               <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="hour" />
@@ -88,5 +161,24 @@ export default function ScenarioReplay() {
         </section>)}
       </div>
     </>}
+    <section className="space-y-2 rounded border p-4">
+      <h2 className="font-semibold">Held-out model test</h2>
+      <p>Precomputed model outputs for a matched held-out wrist window with synthetic cognition. The change case uses scripted perturbations.</p>
+      <p>Validation threshold {modelDemo.threshold.toFixed(4)}</p>
+      <label>Test case <select className="sam-input" value={modelCase}
+        onChange={event => setModelCase(Number(event.target.value))}>
+        {modelDemo.cases.map(({ label }, index) => <option key={label} value={index}>{label}</option>)}
+      </select></label>
+      <dl className="grid gap-2 sm:grid-cols-2">
+        {Object.entries(example.features).map(([name, value]) => (
+          <div key={name}><dt>{name.replace(/_/g, ' ')}</dt><dd>{value.toFixed(3)}</dd></div>
+        ))}
+      </dl>
+      <p aria-live="polite">{example.score === null
+        ? "Score withheld · the test explicitly marks the watch as removed."
+        : `Score ${example.score.toFixed(4)} · ${example.status === "scripted_change_flag" ? "Flagged" : "No flag"}`}</p>
+      <p>Research scenario recognition only. No clinical risk estimate.</p>
+    </section>
   </main>;
 }
+

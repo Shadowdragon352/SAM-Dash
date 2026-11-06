@@ -1,0 +1,63 @@
+# Standalone deployment: do not overlay this onto your local compose.yaml.
+name: sam-private-demo
+services:
+  mongo:
+    image: mongo:8.0
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?Generate a dedicated database password}
+    volumes: [private-mongo:/data/db]
+    networks: [database]
+    healthcheck:
+      test: [CMD, mongosh, --quiet, --eval, "quit(db.adminCommand({ping: 1}).ok ? 0 : 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  api:
+    build:
+      context: .
+      dockerfile: docker/private.Dockerfile
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      PRIVATE_DEMO: "true"
+      PORT: "5000"
+      COOKIE_SECURE: "true"
+      PUBLIC_ORIGIN: https://${DEMO_HOSTNAME:?Set the hostname without a scheme}
+      TEAM_EMAILS: ${TEAM_EMAILS:?Set approved team emails}
+      JWT_SECRET: ${JWT_SECRET:?Generate a dedicated JWT secret}
+      MONGODB_URI: mongodb://root:${MONGO_PASSWORD}@mongo:27017/sam_private_demo?authSource=admin
+      MODEL_URL: ""
+      INGEST_TOKEN: ""
+      VALID_API_KEYS: ""
+      REGISTRATION_CODE: ""
+    depends_on:
+      mongo: {condition: service_healthy}
+    networks: [database, application]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:5000/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+  https:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      DEMO_HOSTNAME: ${DEMO_HOSTNAME}
+    volumes:
+      - ./docker/Caddyfile.private:/etc/caddy/Caddyfile:ro
+      - private-caddy-data:/data
+      - private-caddy-config:/config
+    depends_on:
+      api: {condition: service_healthy}
+    networks: [application]
+volumes:
+  private-mongo:
+  private-caddy-data:
+  private-caddy-config:
+networks:
+  database: {internal: true}
+  application:

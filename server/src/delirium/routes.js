@@ -1,11 +1,13 @@
 import express from "express";
 import mongoose from "mongoose";
 import { randomBytes } from "node:crypto";
+import { liveDemoDevice } from "../middleware/privateDemo.js";
 import protectedRoute from "../middleware/auth.middleware.js";
 import Patient from "../models/Patient.js";
 import { Device, WatchEvent, Assessment } from "./models.js";
 import {
   validateBatch,
+  reading,
   assignmentFor,
   hashToken,
   secretMatches,
@@ -42,10 +44,10 @@ function globalKey(token) {
     .filter(Boolean)
     .some((key) => secretMatches(token, hashToken(key.trim())));
 }
-async function deviceAuth(req, ids) {
+async function deviceAuth(req, ids, scopedOnly = false) {
   const token = bearer(req);
   if (!token) fail("A device Bearer token is required", 401);
-  if (globalKey(token)) return;
+  if (!scopedOnly && globalKey(token)) return;
   if (ids.length !== 1)
     fail("Device token can access only its own device", 403);
   const device = await Device.findOne({ deviceId: ids[0] }).select(
@@ -74,8 +76,19 @@ ingestRouter.post(
   handle(async (req, res) => {
     const events = validateBatch(req.body),
       ids = [...new Set(events.map((e) => e.device_id))];
-    await deviceAuth(req, ids);
+    const liveDevice = liveDemoDevice();
+    if (liveDevice && (ids.length !== 1 || ids[0] !== liveDevice))
+      fail("Device is not enabled for live demo uploads", 403);
     const result = await mutate(async () => {
+      await deviceAuth(req, ids, Boolean(liveDevice));
+      if (liveDevice) {
+        const device = await Device.findOne({ deviceId: liveDevice });
+        if (!device) fail("Live demo device is not registered", 403);
+        if (events.some((event) => {
+          const assignment = assignmentFor(device, event);
+          return !assignment || assignment.to != null;
+        })) fail("Events must match the active volunteer assignment", 403);
+      }
       const existing = await WatchEvent.find({
         event_id: { $in: events.map((e) => e.event_id) },
       })
@@ -158,6 +171,42 @@ ingestRouter.get(
   }),
 );
 researchRouter.use(protectedRoute);
+researchRouter.get("/live-volunteer", handle(async (req, res) => {
+  const deviceId = liveDemoDevice();
+  if (!deviceId) fail("Live volunteer is disabled", 404);
+  const device = await Device.findOne({ deviceId }).lean();
+  const assignment = device?.assignments.find((item) => item.to == null);
+  const latest = async (type, limit, since = 0) => assignment ? WatchEvent.find({
+    device_id: deviceId,
+    study_id: assignment.studyId,
+    patientId: assignment.patientId,
+    assignmentId: assignment._id,
+    type,
+    ts_ms: { $gte: Math.max(assignment.from, since) },
+  }).sort({ ts_ms: -1 }).limit(limit)
+    .select("type source ts_ms receivedAt payload.rms payload.bpm payload.status payload.accuracy").lean() : [];
+  const since = Date.now() - 5 * 60_000;
+  const [[event], [heart], [cognition], movement, pulse] = await Promise.all([
+    latest("movement_5s", 1), latest("heart_rate", 1), latest("cognition_summary", 1),
+    latest("movement_5s", 300, since), latest("heart_rate", 300, since),
+  ]);
+  const points = (events) => events.reverse().map((item) => ({
+    time: item.ts_ms,
+    value: reading(item)?.value ?? null,
+  }));
+  res.json({ timeline: { movement: points(movement), pulse: points(pulse) }, reading: event ? {
+    movementRms: event.payload.rms ?? null,
+    capturedAt: event.ts_ms,
+    receivedAt: event.receivedAt,
+  } : null, heartRate: heart ? {
+    bpm: reading(heart)?.value ?? null,
+    capturedAt: heart.ts_ms,
+  } : null, cognition: cognition ? {
+    accuracy: cognition.payload?.accuracy ?? null,
+    capturedAt: cognition.ts_ms,
+  } : null });
+}));
+
 researchRouter.get(
   "/devices",
   handle(async (req, res) => {
@@ -447,4 +496,5 @@ researchRouter.get(
     }
   }),
 );
+
 

@@ -1,3 +1,5 @@
+import LiveVolunteer from "./pages/LiveVolunteer";
+import { privateDemo } from './lib/privateDemo';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -33,12 +35,14 @@ const App = () => {
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            {privateDemo && <aside className="border-b bg-amber-100 p-3 text-center text-sm text-slate-900">Private team demo · Fully synthetic scenarios · Not for clinical use</aside>}
             <Routes>
+              <Route path="/live-volunteer" element={authUser ? <LiveVolunteer /> : <Navigate to="/login" replace />} />
               <Route path="/scenario-replay" element={authUser ? <ScenarioReplay /> : <Navigate to="/login" replace />} />
               <Route
                 path="/"
                 element={
-                  authUser ? <Index /> : <Navigate to="/login" replace />
+                  authUser ? (privateDemo ? <Navigate to="/scenario-replay" replace /> : <Index />) : <Navigate to="/login" replace />
                 }
               />
               <Route
@@ -47,7 +51,7 @@ const App = () => {
               />
               <Route
                 path="/signup"
-                element={authUser ? <Navigate to="/" replace /> : <SignUp />}
+                element={privateDemo ? <Navigate to="/login" replace /> : authUser ? <Navigate to="/" replace /> : <SignUp />}
               />
 
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
@@ -61,4 +65,5 @@ const App = () => {
 };
 
 export default App;
+
 

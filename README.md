@@ -124,3 +124,8 @@ Please follow the existing code style and include tests where appropriate.
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+
+## Private team demonstration
+
+For the isolated, sign-in-only synthetic replay deployment, see [Private demo setup](docs/PRIVATE_DEMO.md). This setup disables public signup, live device ingestion and model inference.
