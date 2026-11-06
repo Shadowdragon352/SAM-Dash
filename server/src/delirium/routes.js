@@ -176,16 +176,25 @@ researchRouter.get("/live-volunteer", handle(async (req, res) => {
   if (!deviceId) fail("Live volunteer is disabled", 404);
   const device = await Device.findOne({ deviceId }).lean();
   const assignment = device?.assignments.find((item) => item.to == null);
-  const latest = async (type) => assignment && await WatchEvent.findOne({
+  const latest = async (type, limit, since = 0) => assignment ? WatchEvent.find({
     device_id: deviceId,
     study_id: assignment.studyId,
     patientId: assignment.patientId,
     assignmentId: assignment._id,
     type,
-    ts_ms: { $gte: assignment.from },
-  }).sort({ ts_ms: -1 }).select("type source ts_ms receivedAt payload.rms payload.bpm payload.status payload.accuracy").lean();
-  const [event, heart, cognition] = await Promise.all([latest("movement_5s"), latest("heart_rate"), latest("cognition_summary")]);
-  res.json({ reading: event ? {
+    ts_ms: { $gte: Math.max(assignment.from, since) },
+  }).sort({ ts_ms: -1 }).limit(limit)
+    .select("type source ts_ms receivedAt payload.rms payload.bpm payload.status payload.accuracy").lean() : [];
+  const since = Date.now() - 5 * 60_000;
+  const [[event], [heart], [cognition], movement, pulse] = await Promise.all([
+    latest("movement_5s", 1), latest("heart_rate", 1), latest("cognition_summary", 1),
+    latest("movement_5s", 300, since), latest("heart_rate", 300, since),
+  ]);
+  const points = (events) => events.reverse().map((item) => ({
+    time: item.ts_ms,
+    value: reading(item)?.value ?? null,
+  }));
+  res.json({ timeline: { movement: points(movement), pulse: points(pulse) }, reading: event ? {
     movementRms: event.payload.rms ?? null,
     capturedAt: event.ts_ms,
     receivedAt: event.receivedAt,
